@@ -8,17 +8,18 @@ To run SLiMTree run the command python3 SLiMTree -i <your input tree - in newick
 
 
 Additional arguments include:
-  -b: burn in multiplier - a value which will be multiplied by the population size to determine the brun in before the tree splits
 
-  -g: the length of the genome in amino acids
+      -b: burn in multiplier - a value which will be multiplied by the population size to determine the brun in before the tree splits
 
-  -k: sample size - the size of the sample of populations output at the end of the simulation
+      -g: the length of the genome in amino acids
 
-  -n: population size - the size of each population
+      -k: sample size - the size of the sample of populations output at the end of the simulation
 
-  -r: recombination rate
+      -n: population size - the size of each population
 
-  -v: the mutation rate
+      -r: recombination rate
+
+      -v: the mutation rate
 
 
 
