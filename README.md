@@ -26,3 +26,8 @@ Additional arguments include:
 Users may also specify another file under -d which gives this data on specific populations.
 
 Note: for the time being SLiMTree is only able to run on high performance computing clusters as different branches are run through different nodes. 
+
+
+The folder DataPostProcessing contains scripts that were can be used for post processing of the output data and the folder ExampleBatchScripts contains scripts used to run SLiM for my thesis.
+
+Finally, the folder CompiledData contains compiled raw substitution and branch length counts from my thesis project. 
