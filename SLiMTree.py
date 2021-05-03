@@ -22,8 +22,10 @@ from writeSLiM import writeSLiM
 def read_user_input():
     global input_file
     global data_file
+    global partition_data
 
     global starting_parameters
+
 
 
     #Set up starting parameters dictionary 
@@ -34,7 +36,10 @@ def read_user_input():
     parser.add_argument('-i','--input_tree', nargs = 1, required = True, type = str,
             help = 'tree file in newick format specifying the clades to simulate')
     parser.add_argument('-d','--tree_data_file', nargs = 1, type=argparse.FileType('r'),
-            help = 'file specifying population size, mutation rate, etc. for each node, see documentation')
+            help = 'file specifying population size, mutation rate, etc. for each node, see documentation')     
+    parser.add_argument('-p', '--partition', required = True, type = str, help = 'partition to run SLiM-Tree HPC on')
+    parser.add_argument('-t', '--time', required = True, type = str, 
+            help = 'maximum time to run each simulation for - suggested time is the maxmimum time available for a partition')
     
     #Default parameters give a default theta of 0.01
     parser.add_argument('-n','--population_size', help = 'starting population size for the simulation, default = 500', type = int, default = 500)
@@ -48,6 +53,7 @@ def read_user_input():
     arguments = parser.parse_args()
 
     input_file = arguments.input_tree[0]
+    partition_data = [arguments.partition, arguments.time]
 
     #Set up the starting parameters
     starting_parameters["mutation_rate"] = arguments.mutation_rate

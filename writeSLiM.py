@@ -13,13 +13,15 @@ import numpy as np
 class writeSLiM:
 
         #Initialize required parameters
-        def __init__(self, start_para_dict):
+        def __init__(self, start_para_dict, partition_information):
 
                 #Set up variables that remain constant for every part of the simulation
                 self.general_output_filename = start_para_dict["output_file"]
                 self.genome_length = start_para_dict["genome_length"]
                 self.sample_size = start_para_dict["sample_size"]
                 self.fasta_filename = start_para_dict["fasta_filename"]
+                self.partition = partition_information[0]
+                self.partition_time = partition_information[1]
                 
                 #Set up the fitness profile and starting distribution of amino acids
                 self.fitness_profile_nums = start_para_dict["fitness_profile_nums"]
@@ -53,9 +55,9 @@ class writeSLiM:
                 
                 #Create a new script and batch file for the population
                 batch_file = open(self.general_output_filename + "_" + population_parameters["pop_name"] + ".sh", "w")
-                batch_file.write("#!/bin/sh\n\n#SBATCH -J SLiM_Simulation_" + population_parameters["pop_name"] + "\n#SBATCH -t 168:00:00\n#SBATCH -p apophis" +
-                        "\n#SBATCH -o " + population_parameters["pop_name"] + ".out\n#SBATCH -e " + population_parameters["pop_name"] +".err\n#SBATCH -n 1" + 
-                        "\n\nslim " + self.general_output_filename + "_" + population_parameters["pop_name"]+".slim")
+                batch_file.write("#!/bin/sh\n\n#SBATCH -J SLiM_Simulation_" + population_parameters["pop_name"] + "\n#SBATCH -t " + self.partition_time + 
+                        "\n#SBATCH -p "  + self.partition + "\n#SBATCH -o " + population_parameters["pop_name"] + ".out\n#SBATCH -e " + population_parameters["pop_name"] 
+                        +".err\n#SBATCH -n 1" + "\n\nslim " + self.general_output_filename + "_" + population_parameters["pop_name"]+".slim")
                 batch_file.close()
 
                 self.output_file = open(self.general_output_filename + "_" + population_parameters["pop_name"] + ".slim" , "w")
