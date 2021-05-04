@@ -325,9 +325,10 @@ def get_clade_data (clade, parent_clade_dict, clade_data, phylogeny):
 #Using the dictionary of the data from the clades, write slim code to represent the phylogeny
 def write_slim_code (clade_dict_list):
     global starting_parameters
+    global partition_data
 
     #Open SLiM writer and write the initialize statement
-    SLiM_Writer = writeSLiM(starting_parameters)
+    SLiM_Writer = writeSLiM(starting_parameters, partition_data)
 
     #Write a script for each clade which will be run sequentially
     for clade in clade_dict_list:
