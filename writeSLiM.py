@@ -66,7 +66,7 @@ class writeSLiM:
                 self.write_initialize(population_parameters)
                 self.write_fitness()
 
-                #Write the commands to track the generation, save a backup file and track the substitutions
+                #Write the commands to count the substitutions, track the generation and save a backup file
                 simulation_distance_string = (str(int(population_parameters["dist_from_start"])+2) +":" + str(int(population_parameters["end_dist"])) +
                         "late (){\n\tunique_mutations_bools = sapply(sim.mutations, \"sum(applyValue.position == sim.mutations.position);\") == 1;" +
                         "\n\tancestral_genome = sim.getValue(\"fixations\");" +
