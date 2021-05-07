@@ -16,6 +16,7 @@ import numpy as np
 from Bio import Phylo
 from matplotlib.pyplot import show, savefig
 from writeSLiM import writeSLiM
+from writeSLiMHPC import writeSLiMHPC
 
 class SLiMTree:
 
@@ -348,7 +349,7 @@ class SLiMTree:
     def write_slim_code (self, clade_dict_list):
 
         #Open SLiM writer and write the initialize statement
-        SLiM_Writer = writeSLiM(self.starting_parameters, self.partition_data, self.repeated_command_booleans)
+        SLiM_Writer = writeSLiMHPC(self.starting_parameters, self.partition_data, self.repeated_command_booleans)
 
         #Write a script for each clade which will be run sequentially
         for clade in clade_dict_list:
