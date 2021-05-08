@@ -177,19 +177,18 @@ class writeSLiM:
         #Write a command to count the substitutions (identity by state)
         if (count_subs):
             repeated_commands_string += ("\n\tif(length(sim.mutations)!= 0){"
-                        "\n\t\tunique_mutations_bools = sapply(sim.mutations, "+
-                        "\"sum(applyValue.position == sim.mutations.position);\") == 1;" +
-                        "\n\t\tancestral_genome = sim.getValue(\"fixations\");" +
-                        "\n\t\tcompare_genome = strsplit(p1.genomes[0].nucleotides(), sep = \'\');"+
+                        "\n\t\tancestral_genome = sim.getValue(\"fixations_" + pop_name + "\");" +
+                        "\n\t\tcompare_genome = strsplit(" + pop_name + ".genomes[0].nucleotides(), sep = \'\');"+
                         "\n\t\tfixed_nucs = rep(T, length(compare_genome));" +
-                        "\n\n\t\tfor (genome in (p1.genomes)){" +
+                        "\n\n\t\tfor (genome in (" + pop_name + ".genomes)){" +
                         "\n\t\t\tsame_nucs = (compare_genome == strsplit(genome.nucleotides(), sep = \'\'));" +
                         "\n\t\t\tfixed_nucs = (fixed_nucs & same_nucs);\n\t\t}" +
                         "\n\n\t\tdifferent_muts = (ancestral_genome != compare_genome);" +
                         "\n\t\tnew_fixations = different_muts & fixed_nucs;" +
-                        "\n\t\tsim.setValue(\"fixations_counted\", sim.getValue(\"fixations_counted\") + sum(new_fixations));" +
+                        "\n\t\tsim.setValue(\"fixations_counted_" + pop_name + 
+                        "\", sim.getValue(\"fixations_counted_" + pop_name+ "\") + sum(new_fixations));" +
                         "\n\n\t\tancestral_genome[new_fixations] = compare_genome[new_fixations];" +
-                        "\n\t\tsim.setValue(\"fixations\", ancestral_genome);\n\t};")
+                        "\n\t\tsim.setValue(\"fixations_" + pop_name + "\", ancestral_genome);\n\t};")
           
         #Write a command to output when every 100th generation has passed
         if(output_gens):
@@ -209,28 +208,43 @@ class writeSLiM:
         
 
     
-    #Write code to add a new population to the simulation by either creating the initial population or splitting a pop
+    #Write code to add first population, subpopulation or completely remove population and replace with another
     def write_subpop(self, population_parameters):
-    
-        #If first population make the population, set up the simulation
+            
+                                        
         if(population_parameters["parent_pop_name"] == None):
-            self.set_up_sim()
-        
-        else :
-            self.set_up_pop()
+                self.set_up_sim(population_parameters)
+        else:
+            #Not the starting population, break off from existing population
+            define_population_string = (str(int(population_parameters["dist_from_start"])+1) + " { \n" +
+                    "\tsim.addSubpopSplit(\""+ population_parameters["pop_name"] + "\"," +
+                    str(population_parameters["population_size"]) + ", " + population_parameters["parent_pop_name"]+ ");"+
+                    "\n\n\tsim.setValue(\"fixations_" + population_parameters["pop_name"] + "\", sim.getValue(\"fixations_"+
+                    population_parameters["parent_pop_name"] +"\"));" +
+                    "\n\tsim.setValue(\"fixations_counted_"+ population_parameters["pop_name"]+"\", 0);")
 
-        
-        
+            if(population_parameters["last_child_clade"] == True):
+                define_population_string += "\n\t" + population_parameters["parent_pop_name"]+".setSubpopulationSize(0);"    
+
+            define_population_string += "\n}\n\n\n" 
+                                            
+            self.output_file.write(define_population_string)
+                
+                
         #Write the commands that are run for every simulation and the starting population
         self.write_repeated_commands(int(population_parameters["dist_from_start"])+2, 
                         int(population_parameters["end_dist"]), population_parameters["pop_name"],
                         self.repeated_commands_booleans[0], self.repeated_commands_booleans[1],
                         self.repeated_commands_booleans[2])
+                        
+        #Write the end of each population
+        self.write_end_pop(population_parameters)
         
     
     
+    
     #Set up the simulation by initializing everything
-    def set_up_sim(self):
+    def set_up_sim(self, population_parameters):
         self.output_file = open(self.general_output_filename + "_" + population_parameters["pop_name"] + ".slim" , "w")
 
         #Set up the initialize and fitness functions for the new script
@@ -239,27 +253,79 @@ class writeSLiM:
         
         
         #Make the population and set up fitness effects
-        pop_string = "1 late() {" +
+        pop_string = ("1 late() {" +
                     "\n\tsetup_fitness();" +
                     "\n\twriteFile(\"" + self.fasta_filename + "_aa.fasta\", \"\", append = F);" +
                     "\n\twriteFile(\"" + self.fasta_filename + "_nuc.fasta\", \"\", append = F);" +
                     "\n\tsim.addSubpop(\"p1\", " + str(population_parameters["population_size"]) + ");" )
 
         #Write code to start a fixed state from the starting nucleotide sequence
-        pop_string += "sim.setValue(\"fixations\", strsplit(sim.chromosome.ancestralNucleotides(),sep = \"\"));"
+        pop_string += "sim.setValue(\"fixations_p1\", strsplit(sim.chromosome.ancestralNucleotides(),sep = \"\"));"
 
         #At the start of the sim there are no fixations counted
-        pop_string += "\n\tsim.setValue(\"fixations_counted\", 0);"
+        pop_string += "\n\tsim.setValue(\"fixations_counted_p1\", 0);"
         pop_string += "\n}\n\n\n"
                                             
         self.output_file.write(pop_string)
         
         
-    #Set up population by splitting from an existing populaiton
-    def set_up_pop(self):
-        #Make the population from parent population
-        #NEED TO WRITE CODE TO SPLIT FROM THE PARENT POPULATION
-        
-        
+    #Write the end of a population to save the number of substitutions and output sequence data
+    def write_end_pop (self, population_parameters):
+        end_population_string = str(int(population_parameters["end_dist"]) + 1) + " late() {"
 
+        #If terminal clade output data 
+        if(population_parameters["terminal_clade"]):
+            end_population_string += self.write_terminal_output(population_parameters, pop = population_parameters["pop_name"])
+        
+        #Write file with the substitution counts
+        if(self.repeated_commands_booleans[0]):
+            end_population_string += ("\n\twriteFile(\"" + os.getcwd()+ "/" + population_parameters["pop_name"] + "_fixed_mutation_counts.txt\"," +
+                "asString(sim.getValue(\"fixations_counted_" + population_parameters["pop_name"] + "\")));" +
+                "\n\twriteFile(\"" + os.getcwd()+ "/" + population_parameters["pop_name"] + "_fixed_mutations.txt\"," +
+                " paste(sim.getValue(\"fixations_" + population_parameters["pop_name"] + "\"), sep = \"\"));")
+                
+        end_population_string += "\n}"        
+        
+        self.output_file.write(end_population_string)
+ 
+
+
+
+    #Write code to write the output for terminal populations after they have reached their population
+    def write_terminal_output(self, population_parameters, pop = "p1"):
+
+        #Set up the names of the 3 fasta files to be output to
+        nuc_filename = self.fasta_filename + "_nuc.fasta"
+        aa_filename =  self.fasta_filename + "_aa.fasta"
+        ancestral_filename = self.fasta_filename + "_fixed.fasta"
+
+
+        #Set up sampling of the population
+        pop_name = population_parameters["pop_name"]              
+        pop_size = population_parameters["population_size"]
+
+        if(self.sample_size == "all"):
+            pop_samples = list(range(pop_size))
+        elif(int(self.sample_size) < pop_size):
+            pop_samples = random.sample(list(range(pop_size)), int(self.sample_size))
+        else:
+            pop_samples = list(range(pop_size))
+
+
+
+        #Iterate through each random sample to write script to output samples of amino acids and nucleotides to fasta files
+        terminal_output_string = ""
+        count = 0
+        for sample in pop_samples:
+            fasta_string_nuc = "\">" + pop_name + "_" + str(count) + ": \\n\" + g.nucleotides()"
+            fasta_string_aa = "\">" + pop_name + "_" + str(count) + ": \\n\" + codonsToAminoAcids(nucleotidesToCodons(g.nucleotides()))"
+            
+            
+            terminal_output_string += ("\n\tg = "+ pop +".genomes[" + str(sample) + "];" +
+                                       "\n\twriteFile(\"" + nuc_filename + "\", " + fasta_string_nuc +", append = T);" +
+                                       "\n\twriteFile(\"" + aa_filename + "\", " + fasta_string_aa +", append = T);\n\n")
+            count += 1
+
+
+        return terminal_output_string	
 

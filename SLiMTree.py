@@ -10,8 +10,9 @@
 #numpy
 #os
 #json
+#string
 
-import sys, argparse, random, csv, os, json
+import sys, argparse, random, csv, os, json, string
 import numpy as np
 from Bio import Phylo
 from matplotlib.pyplot import show, savefig
@@ -46,10 +47,13 @@ class SLiMTree:
         parser.add_argument('-i','--input_tree', nargs = 1, required = True, type = str,
                 help = 'tree file in newick format specifying the clades to simulate')
         parser.add_argument('-d','--tree_data_file', nargs = 1, type=argparse.FileType('r'),
-                help = 'file specifying population size, mutation rate, etc. for each node, see documentation')     
-        parser.add_argument('-p', '--partition', required = True, type = str, help = 'partition to run SLiM-Tree HPC on')
-        parser.add_argument('-t', '--time', required = True, type = str, 
+                help = 'file specifying population size, mutation rate, etc. for each node, see documentation')
+        parser.add_argument('-t', '--tool', type = str, required = True, 
+                help = 'name of tool you would like to use. Options include SLiM-Tree, SLiM-Tree-HPC. Default = SLiM-Tree')
+        parser.add_argument('-p', '--partition', type = str, help = 'partition to run SLiM-Tree HPC on')
+        parser.add_argument('-T', '--time', type = str, 
                 help = 'maximum time to run each simulation for - suggested time is the maxmimum time available for a partition')
+         
         
         #Default parameters are somewhat arbitrary and should be changed for each sim
         parser.add_argument('-n','--population_size', help = 'starting population size for the simulation, default = 100', type = int, default = 100)
@@ -73,6 +77,7 @@ class SLiMTree:
         self.input_file = arguments.input_tree[0]
         self.partition_data = [arguments.partition, arguments.time]
         self.repeated_command_booleans = [arguments.count_subs, arguments.output_gens, arguments.backup]
+        self.simulationType = arguments.tool.translate(str.maketrans('', '', string.punctuation)).lower()
 
         #Set up the starting parameters
         self.starting_parameters["mutation_rate"] = arguments.mutation_rate
@@ -347,16 +352,25 @@ class SLiMTree:
 
     #Using the dictionary of the data from the clades, write slim code to represent the phylogeny
     def write_slim_code (self, clade_dict_list):
-
-        #Open SLiM writer and write the initialize statement
-        SLiM_Writer = writeSLiMHPC(self.starting_parameters, self.partition_data, self.repeated_command_booleans)
+        
+        #Open SLiM writer based on tool type and write the initialize statement
+        
+        if(self.simulationType == "slimtree"):
+            SLiM_Writer = writeSLiM(self.starting_parameters, self.partition_data, self.repeated_command_booleans)
+        elif(self.simulationType == "slimtreehpc"):
+            SLiM_Writer = writeSLiMHPC(self.starting_parameters, self.partition_data, self.repeated_command_booleans)
+        else:
+            raise InputError("Invalid tool type. Please specify a tool as SLiM-Tree or SLim-Tree-HPC")
 
         #Write a script for each clade which will be run sequentially
         for clade in clade_dict_list:
             SLiM_Writer.write_subpop(clade)
 
         #Start the SLiM code to run
-        os.system("sbatch \"" + self.starting_parameters["output_file"] + "_p1.sh\"")
+        if(self.simulationType == "slimtree"):
+            os.system("slim \"" + self.starting_parameters["output_file"] + "_p1.slim\"")
+        elif(self.simulationType == "slimtreehpc"):
+            os.system("sbatch \"" + self.starting_parameters["output_file"] + "_p1.sh\"")
 
 
 

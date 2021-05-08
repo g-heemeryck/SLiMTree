@@ -24,7 +24,7 @@ class writeSLiMHPC(writeSLiM):
         super().write_fitness()
 
         #Write the commands that are run for every simulation and the starting population
-        super().write_repeated_commands(int(population_parameters["dist_from_start"])+2, 
+        self.write_repeated_commands(int(population_parameters["dist_from_start"])+2, 
                             int(population_parameters["end_dist"]), population_parameters["pop_name"],
                             self.repeated_commands_booleans[0], self.repeated_commands_booleans[1], 
                             self.repeated_commands_booleans[2])
@@ -73,6 +73,41 @@ class writeSLiMHPC(writeSLiM):
                                             
         self.output_file.write(pop_string)
         
+        
+    #Write code to count substitutions, make a backup and count generations
+    def write_repeated_commands(self, start_dist, end_dist, pop_name, count_subs = True, output_gens = True, backup = True):
+        repeated_commands_string = str(start_dist) +":" + str(end_dist) + "late () {"
+        
+        #Write a command to count the substitutions (identity by state)
+        if (count_subs):
+            repeated_commands_string += ("\n\tif(length(sim.mutations)!= 0){"
+                        "\n\t\tancestral_genome = sim.getValue(\"fixations_p1\");" +
+                        "\n\t\tcompare_genome = strsplit(p1.genomes[0].nucleotides(), sep = \'\');"+
+                        "\n\t\tfixed_nucs = rep(T, length(compare_genome));" +
+                        "\n\n\t\tfor (genome in (p1.genomes)){" +
+                        "\n\t\t\tsame_nucs = (compare_genome == strsplit(genome.nucleotides(), sep = \'\'));" +
+                        "\n\t\t\tfixed_nucs = (fixed_nucs & same_nucs);\n\t\t}" +
+                        "\n\n\t\tdifferent_muts = (ancestral_genome != compare_genome);" +
+                        "\n\t\tnew_fixations = different_muts & fixed_nucs;" +
+                        "\n\t\tsim.setValue(\"fixations_counted_p1\", sim.getValue(\"fixations_counted_p1\") + sum(new_fixations));" +
+                        "\n\n\t\tancestral_genome[new_fixations] = compare_genome[new_fixations];" +
+                        "\n\t\tsim.setValue(\"fixations_p1\", ancestral_genome);\n\t};")
+          
+        #Write a command to output when every 100th generation has passed
+        if(output_gens):
+            repeated_commands_string += "\n\n\tif (sim.generation%100 == 0) {\n\t\tcatn(sim.generation);\n\t};"
+            
+
+        #Write a command to write a backup of all individuals after every 100 generations
+        if (backup):
+             repeated_commands_string += ("\n\n\tif (sim.generation%100 == 0) {" +
+                        "\n\t\twriteFile(\"" + os.getcwd()+ "/backupFiles/" + pop_name + ".fasta\"," + 
+                        "(\">parent_ancestral_to_load\\n\" + sim.chromosome.ancestralNucleotides()));" +
+                        "\n\t\tsim.outputFull(\"" + os.getcwd()+ "/backupFiles/" + pop_name + ".txt\");\n\t};")
+        
+        repeated_commands_string += "\n}\n\n\n"
+        
+        self.output_file.write(repeated_commands_string)
 
 
     #Write the closing statements to end the simulation and either allow for starting of subsequent simulations or output data (depending on terminal status)
@@ -82,7 +117,7 @@ class writeSLiMHPC(writeSLiM):
 
         #If terminal clade output data otherwise create data to be loaded into scripts of the clades children
         if(population_parameters["terminal_clade"]):
-            end_population_string += self.write_terminal_output(population_parameters)
+            end_population_string += super().write_terminal_output(population_parameters)
         else:
             end_population_string += ("\n\twriteFile(\"" + population_parameters["pop_name"] +
                                       ".fasta\", (\">parent_ancestral_to_load\\n\" + sim.chromosome.ancestralNucleotides()));" +
@@ -90,9 +125,9 @@ class writeSLiMHPC(writeSLiM):
 
         #Scripting to end the simulation and write the fixed mutations
         end_population_string += ("\n\twriteFile(\"" + population_parameters["pop_name"] + "_fixed_mutation_counts.txt\"," +
-                "asString(sim.getValue(\"fixations_counted\")));" +
+                "asString(sim.getValue(\"fixations_counted_p1\")));" +
                 "\n\twriteFile(\"" + population_parameters["pop_name"] + "_fixed_mutations.txt\"," +
-                " paste(sim.getValue(\"fixations\"), sep = \"\"));")
+                " paste(sim.getValue(\"fixations_p1\"), sep = \"\"));")
 
         end_population_string += "\n\tsim.outputFixedMutations();"
 
@@ -110,40 +145,4 @@ class writeSLiMHPC(writeSLiM):
 
 
 
-    #Write code to write the output for terminal populations after they have reached their population
-    def write_terminal_output(self, population_parameters):
-
-        #Set up the names of the 3 fasta files to be output to
-        nuc_filename = self.fasta_filename + "_nuc.fasta"
-        aa_filename =  self.fasta_filename + "_aa.fasta"
-        ancestral_filename = self.fasta_filename + "_fixed.fasta"
-
-
-        #Set up sampling of the population
-        pop_name = population_parameters["pop_name"]              
-        pop_size = population_parameters["population_size"]
-
-        if(self.sample_size == "all"):
-            pop_samples = list(range(pop_size))
-        elif(int(self.sample_size) < pop_size):
-            pop_samples = random.sample(list(range(pop_size)), int(self.sample_size))
-        else:
-            pop_samples = list(range(pop_size))
-
-
-
-        #Iterate through each random sample to write script to output samples of amino acids and nucleotides to fasta files
-        terminal_output_string = ""
-        count = 0
-        for sample in pop_samples:
-            fasta_string_nuc = "\">" + pop_name + "_" + str(count) + ": \\n\" + g.nucleotides()"
-            fasta_string_aa = "\">" + pop_name + "_" + str(count) + ": \\n\" + codonsToAminoAcids(nucleotidesToCodons(g.nucleotides()))"
-            
-            
-            terminal_output_string += ("\n\tg = p1.genomes[" + str(sample) + "];" +
-                                       "\n\twriteFile(\"" + nuc_filename + "\", " + fasta_string_nuc +", append = T);" +
-                                       "\n\twriteFile(\"" + aa_filename + "\", " + fasta_string_aa +", append = T);\n\n")
-            count += 1
-
-
-        return terminal_output_string	
+    
