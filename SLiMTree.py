@@ -146,14 +146,14 @@ class SLiMTree:
 
     #Read fitness profile and stationary distribution data from psi_c50 file, make fitness profiles
     def find_fitness_profile(self):
-    
-        fitness_profile_nums = random.choices(range(50),k=self.starting_parameters["genome_length"]-2 )
-        #print("Fitness profile nums:" + str(fitness_profile_nums))
-
         #Open stationary and fitness effects csv and make into list
         with open(os.path.dirname(os.path.realpath(__file__)) + '/fitnessDataFiles/table_fitness_profiles.csv', newline='') as fitness_file:
             reader = csv.reader(fitness_file)
             fitness_dist = list(reader)[1:]
+            fitness_length = len(fitness_dist)
+            #print("Fitness profile length: " + str(fitness_length))
+            fitness_profile_nums = random.choices(range(fitness_length),k=self.starting_parameters["genome_length"]-2 ) # HERE ***
+            #print("Fitness profile nums: " + str(fitness_profile_nums))
         
 
         with open(os.path.dirname(os.path.realpath(__file__)) + '/fitnessDataFiles/table_stationary_distributions.csv', newline='') as stationary_file:
