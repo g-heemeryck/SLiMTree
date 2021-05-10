@@ -10,12 +10,14 @@
 #numpy
 #os
 #json
+#string
 
-import sys, argparse, random, csv, os, json
+import sys, argparse, random, csv, os, json, string
 import numpy as np
 from Bio import Phylo
 from matplotlib.pyplot import show, savefig
 from writeSLiM import writeSLiM
+from writeSLiMHPC import writeSLiMHPC
 
 class SLiMTree:
 
@@ -40,29 +42,42 @@ class SLiMTree:
         #Set up starting parameters dictionary 
         self.starting_parameters = {}
 
-        
+        #Parse for arguments given by the user
         parser = argparse.ArgumentParser(description='A program to make slim simulations from newick phylogeny files')
         parser.add_argument('-i','--input_tree', nargs = 1, required = True, type = str,
                 help = 'tree file in newick format specifying the clades to simulate')
         parser.add_argument('-d','--tree_data_file', nargs = 1, type=argparse.FileType('r'),
-                help = 'file specifying population size, mutation rate, etc. for each node, see documentation')     
-        parser.add_argument('-p', '--partition', required = True, type = str, help = 'partition to run SLiM-Tree HPC on')
-        parser.add_argument('-t', '--time', required = True, type = str, 
+                help = 'file specifying population size, mutation rate, etc. for each node, see documentation')
+        parser.add_argument('-t', '--tool', type = str, required = True, 
+                help = 'name of tool you would like to use. Options include SLiM-Tree, SLiM-Tree-HPC. Default = SLiM-Tree')
+        parser.add_argument('-p', '--partition', type = str, help = 'partition to run SLiM-Tree HPC on')
+        parser.add_argument('-T', '--time', type = str, 
                 help = 'maximum time to run each simulation for - suggested time is the maxmimum time available for a partition')
+         
         
-        #Default parameters give a default theta of 0.01
-        parser.add_argument('-n','--population_size', help = 'starting population size for the simulation, default = 500', type = int, default = 500)
-        parser.add_argument('-v','--mutation_rate', help = 'starting mutation rate for the simulation, default = 0.000001', type=float, default = 0.000001)
-        parser.add_argument('-g','--genome_length', help = 'length of the genome - amino acids, default = 3.33e5', type=int, default = 3.33e5)
-        parser.add_argument('-r','--recombination_rate', help = 'recombination rate, default = 1e-8', type=float, default = 1e-8)
-        parser.add_argument('-b','--burn_in_multiplier', help = 'value to multiply popsize by for burn in, default = 10', type=float, default = 10)
+        #Default parameters are somewhat arbitrary and should be changed for each sim
+        parser.add_argument('-n','--population_size', help = 'starting population size for the simulation, default = 100', type = int, default = 100)
+        parser.add_argument('-v','--mutation_rate', help = 'starting mutation rate for the simulation, default = 2.5e-6', type=float, default = 2.5e-6)
+        parser.add_argument('-g','--genome_length', help = 'length of the genome - amino acids, default = 500', type=int, default = 500)
+        parser.add_argument('-r','--recombination_rate', help = 'recombination rate, default = 2.5e-8', type=float, default = 2.5e-8)
+        parser.add_argument('-b','--burn_in_multiplier', help = 'value to multiply population size by for burn in, default = 10', type=float, default = 10)
         parser.add_argument('-k','--sample_size', help = 'size of sample obtained from each population at output. Input all for whole sample,  default = 10', type=str, default = "10")
+    
+        parser.add_argument('-c','--count_subs', type = self.str2bool, default = True, const=True, nargs='?',
+                help = 'boolean specifying whether to count substitutions, turning off will speed up sims. default = True')
+        parser.add_argument('-o','--output_gens', type = self.str2bool, default = True, const=True, nargs='?',
+                help = 'boolean specifying whether to output the generation after every 100th generation. default = True')
+        parser.add_argument('-B','--backup', type = self.str2bool, default = True, const=True, nargs='?',
+                help = 'boolean specifying whether to backup simulations, turning off will save space. default = True')
+
 
         #Set up important variables
         arguments = parser.parse_args()
 
         self.input_file = arguments.input_tree[0]
         self.partition_data = [arguments.partition, arguments.time]
+        self.repeated_command_booleans = [arguments.count_subs, arguments.output_gens, arguments.backup]
+        self.simulationType = arguments.tool.translate(str.maketrans('', '', string.punctuation)).lower()
 
         #Set up the starting parameters
         self.starting_parameters["mutation_rate"] = arguments.mutation_rate
@@ -116,6 +131,17 @@ class SLiMTree:
         parameter_file.close()
 
 
+    #Command to take input from user and convert to bool
+    #From: https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
+    def str2bool(self, v):
+        if isinstance(v, bool):
+            return v
+        if v.lower() in ('yes', 'true', 't', 'y', '1'):
+            return True
+        elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+            return False
+        else:
+            raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
     #Read fitness profile and stationary distribution data from psi_c50 file, make fitness profiles
@@ -326,16 +352,25 @@ class SLiMTree:
 
     #Using the dictionary of the data from the clades, write slim code to represent the phylogeny
     def write_slim_code (self, clade_dict_list):
-
-        #Open SLiM writer and write the initialize statement
-        SLiM_Writer = writeSLiM(self.starting_parameters, self.partition_data)
+        
+        #Open SLiM writer based on tool type and write the initialize statement
+        
+        if(self.simulationType == "slimtree"):
+            SLiM_Writer = writeSLiM(self.starting_parameters, self.partition_data, self.repeated_command_booleans)
+        elif(self.simulationType == "slimtreehpc"):
+            SLiM_Writer = writeSLiMHPC(self.starting_parameters, self.partition_data, self.repeated_command_booleans)
+        else:
+            raise InputError("Invalid tool type. Please specify a tool as SLiM-Tree or SLim-Tree-HPC")
 
         #Write a script for each clade which will be run sequentially
         for clade in clade_dict_list:
             SLiM_Writer.write_subpop(clade)
 
         #Start the SLiM code to run
-        os.system("sbatch \"" + self.starting_parameters["output_file"] + "_p1.sh\"")
+        if(self.simulationType == "slimtree"):
+            os.system("slim \"" + self.starting_parameters["output_file"] + "_p1.slim\"")
+        elif(self.simulationType == "slimtreehpc"):
+            os.system("sbatch \"" + self.starting_parameters["output_file"] + "_p1.sh\"")
 
 
 
