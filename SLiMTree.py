@@ -78,6 +78,10 @@ class SLiMTree:
         self.partition_data = [arguments.partition, arguments.time]
         self.repeated_command_booleans = [arguments.count_subs, arguments.output_gens, arguments.backup]
         self.simulationType = arguments.tool.translate(str.maketrans('', '', string.punctuation)).lower()
+        
+        if (self.simulationType == "slimtreehpc" and arguments.partition == None):
+            raise Exception("When using SLiMTree-HPC, partition data must be provided. Closing program.")
+            sys.exit(0)
 
         #Set up the starting parameters
         self.starting_parameters["mutation_rate"] = arguments.mutation_rate
