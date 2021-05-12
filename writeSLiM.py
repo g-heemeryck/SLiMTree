@@ -129,8 +129,15 @@ class writeSLiM:
         fitness_vector = str(self.fitness_profile_nums)
         fitness_vector = "c(" + fitness_vector[1:len(fitness_vector)-1] + ")"
         set_up_fitness += ("\n\tdefineConstant(\"fitness_profiles\", " + fitness_vector +");" +
-                           "\n\tdefineConstant(\"seq_length\", " + str(len(self.fitness_profile_nums)+2) + ");" +
-                           "\n}\n\n\n")
+                           "\n\tdefineConstant(\"seq_length\", " + str(len(self.fitness_profile_nums)+2) + ");")
+
+        #Write code to start a fixed state from the starting nucleotide sequence
+        set_up_fitness += "sim.setValue(\"fixations_p1\", strsplit(sim.chromosome.ancestralNucleotides(),sep = \"\"));"
+
+        #At the start of the sim there are no fixations counted
+        set_up_fitness += "\n\tsim.setValue(\"fixations_counted_p1\", 0);"
+        set_up_fitness += "\n}\n\n\n"
+
                                                                                                   
         self.output_file.write(set_up_fitness)
 
@@ -257,14 +264,8 @@ class writeSLiM:
                     "\n\tsetup_fitness();" +
                     "\n\twriteFile(\"" + self.fasta_filename + "_aa.fasta\", \"\", append = F);" +
                     "\n\twriteFile(\"" + self.fasta_filename + "_nuc.fasta\", \"\", append = F);" +
-                    "\n\tsim.addSubpop(\"p1\", " + str(population_parameters["population_size"]) + ");" )
-
-        #Write code to start a fixed state from the starting nucleotide sequence
-        pop_string += "sim.setValue(\"fixations_p1\", strsplit(sim.chromosome.ancestralNucleotides(),sep = \"\"));"
-
-        #At the start of the sim there are no fixations counted
-        pop_string += "\n\tsim.setValue(\"fixations_counted_p1\", 0);"
-        pop_string += "\n}\n\n\n"
+                    "\n\tsim.addSubpop(\"p1\", " + str(population_parameters["population_size"]) + ");"+ 
+                    "\n}\n\n\n")
                                             
         self.output_file.write(pop_string)
         
