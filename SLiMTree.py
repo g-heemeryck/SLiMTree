@@ -358,13 +358,14 @@ class SLiMTree:
     def write_slim_code (self, clade_dict_list):
         
         #Open SLiM writer based on tool type and write the initialize statement
-        
+        print(self.simulationType)        
+
         if(self.simulationType == "slimtree"):
             SLiM_Writer = writeSLiM(self.starting_parameters, self.partition_data, self.repeated_command_booleans)
         elif(self.simulationType == "slimtreehpc"):
             SLiM_Writer = writeSLiMHPC(self.starting_parameters, self.partition_data, self.repeated_command_booleans)
         else:
-            raise InputError("Invalid tool type. Please specify a tool as SLiM-Tree or SLim-Tree-HPC")
+            raise NameError("Invalid tool type. Please specify a tool as SLiM-Tree or SLiM-Tree-HPC")
 
         #Write a script for each clade which will be run sequentially
         for clade in clade_dict_list:
