@@ -30,7 +30,9 @@ class writeSLiM:
         self.fitness_profiles = start_para_dict["fitness_profiles"]
         self.starting_allele_dist = start_para_dict["stationary_distributions"]
         self.amino_acids = start_para_dict["amino_acids"]
-
+        
+        #Set up type of model?
+        self.model_type = start_para_dict["wf_model"]
 
         #Set up conversion from amino acid to codon
         with open(os.path.dirname(os.path.realpath(__file__)) + '/fitnessDataFiles/slim_codon_nums.csv', newline='') as slim_codon_nums:
@@ -53,10 +55,12 @@ class writeSLiM:
         #Write the initialize function for the SLiM script
     def write_initialize(self, population_parameters):
         
-        initialize_string = ("initialize() {" +
-                             "\n\tsetSeed(" + str(random.randint(0,1000000000)) + ");" +
-                             "\n\tinitializeSLiMOptions(nucleotideBased=T);")
+        initialize_string = ("initialize() {")
 
+        if (self.model_type == False): #***
+            initialize_string += "\n\tinitializeSLiMModelType(\"nonWF\");" #****
+
+        initialize_string += ("\n\tsetSeed(" + str(random.randint(0,1000000000)) + ");" + "\n\tinitializeSLiMOptions(nucleotideBased=T);")
 
         #Starting population does not inherit parent sequence, other populations do
         if(population_parameters["parent_pop_name"] == None):                
@@ -176,6 +180,14 @@ class writeSLiM:
         self.output_file.write(fitness_callback_string)
 
 
+    #Write the reproduction callback for non-Wright-Fisher models
+    def write_reproduction(self):
+        #Basic reproduction callback for now; more functionality could be added later if necessary.
+        reproduction_string = ("reproduction() { " +
+                            "\n\tsubpop.addCrossed(individual, subpop.sampleIndividuals(1));" +
+                            "\n }\n\n\n")
+
+        self.output_file.write(reproduction_string)
 
     #Write code to count substitutions, make a backup and count generations
     def write_repeated_commands(self, start_dist, end_dist, pop_name, count_subs = True, output_gens = True, backup = True):
@@ -239,7 +251,7 @@ class writeSLiM:
                 
                 
         #Write the commands that are run for every simulation and the starting population
-        self.write_repeated_commands(int(population_parameters["dist_from_start"])+2, 
+        self.write_repeated_commands(int(population_parameters["dist_from_start"])+1, 
                         int(population_parameters["end_dist"]), population_parameters["pop_name"],
                         self.repeated_commands_booleans[0], self.repeated_commands_booleans[1],
                         self.repeated_commands_booleans[2])
@@ -247,7 +259,47 @@ class writeSLiM:
         #Write the end of each population
         self.write_end_pop(population_parameters)
         
-    
+    #Write code to add first population, subpopulation or completely remove population and replace with another with non-Wright-Fisher models
+    def write_subpop_nonwf(self, population_parameters):
+        if(population_parameters["parent_pop_name"] == None):
+                self.set_up_sim(population_parameters)
+        else:
+            #Not the starting population, break off from existing population
+            define_population_string = (str(int(population_parameters["dist_from_start"])) + " late() { \n" +
+                                    "\tsim.addSubpop(\"" + population_parameters["pop_name"] + "\", 0);")
+            #If this is the last population broken off, take the last half of the parent population
+            if (population_parameters["last_child_clade"] == True):
+                define_population_string += str("\n\t" + population_parameters["pop_name"] + ".takeMigrants(" + population_parameters["parent_pop_name"] + ".individuals);")
+            else:
+                #Take half of the parent population
+                define_population_string += str("\n\tmigrants = sample(" + population_parameters["parent_pop_name"] + ".individuals, integerDiv("
+                                    + population_parameters["parent_pop_name"] + ".individualCount, 2));\n\t"
+                                    + population_parameters["pop_name"] + ".takeMigrants(migrants);")
+
+            define_population_string += str("\n\n\tsim.setValue(\"fixations_" + population_parameters["pop_name"] + "\", sim.getValue(\"fixations_"+
+                                    population_parameters["parent_pop_name"] +"\"));" +
+                                    "\n\tsim.setValue(\"fixations_counted_"+ population_parameters["pop_name"]+"\", 0);")
+
+
+            define_population_string += "\n}\n\n\n"
+
+            self.output_file.write(define_population_string)
+
+        #Write the early commands - this may need tweaking w/ the fitness algorithm
+
+        early_event = str(int(population_parameters["dist_from_start"]) + 1) + ":" + str(int(population_parameters["end_dist"])) + " early(){\n\t" + population_parameters["pop_name"] + ".fitnessScaling = 500/ " + population_parameters["pop_name"] + ".individualCount;" + "\n}\n\n\n"
+
+        self.output_file.write(early_event)
+
+
+        #Write the commands that are run for every simulation and the starting population
+        self.write_repeated_commands(int(population_parameters["dist_from_start"])+1,
+                        int(population_parameters["end_dist"]), population_parameters["pop_name"],
+                        self.repeated_commands_booleans[0], self.repeated_commands_booleans[1],
+                        self.repeated_commands_booleans[2])
+
+        #Write the end of each population
+        self.write_end_pop(population_parameters)
     
     
     #Set up the simulation by initializing everything
@@ -258,21 +310,30 @@ class writeSLiM:
         self.write_initialize(population_parameters)
         self.write_fitness()
         
+        #Write reproduction callback if this is a non-WF model
+        if (self.model_type == False):
+            self.write_reproduction()
         
         #Make the population and set up fitness effects
-        pop_string = ("1 late() {" +
+        pop_string = ("1 early() {" +
                     "\n\tsetup_fitness();" +
                     "\n\twriteFile(\"" + self.fasta_filename + "_aa.fasta\", \"\", append = F);" +
                     "\n\twriteFile(\"" + self.fasta_filename + "_nuc.fasta\", \"\", append = F);" +
-                    "\n\tsim.addSubpop(\"p1\", " + str(population_parameters["population_size"]) + ");"+ 
-                    "\n}\n\n\n")
+                    "\n\tsim.addSubpop(\"p1\", " + str(population_parameters["population_size"]) + ");")
+        
+        #Write code to start a fixed state from the starting nucleotide sequence
+        pop_string += "\n\tsim.setValue(\"fixations_p1\", strsplit(sim.chromosome.ancestralNucleotides(),sep = \"\"));"
+
+        #At the start of the sim there are no fixations counted
+        pop_string += "\n\tsim.setValue(\"fixations_counted_p1\", 0);"
+        pop_string += "\n}\n\n\n"
                                             
         self.output_file.write(pop_string)
         
         
     #Write the end of a population to save the number of substitutions and output sequence data
     def write_end_pop (self, population_parameters):
-        end_population_string = str(int(population_parameters["end_dist"]) + 1) + " late() {"
+        end_population_string = str(int(population_parameters["end_dist"])) + " late() {"
 
         #If terminal clade output data 
         if(population_parameters["terminal_clade"]):
@@ -285,7 +346,7 @@ class writeSLiM:
                 "\n\twriteFile(\"" + os.getcwd()+ "/" + population_parameters["pop_name"] + "_fixed_mutations.txt\"," +
                 " paste(sim.getValue(\"fixations_" + population_parameters["pop_name"] + "\"), sep = \"\"));")
                 
-        end_population_string += "\n}"        
+        end_population_string += "\n}\n\n\n"        
         
         self.output_file.write(end_population_string)
  
