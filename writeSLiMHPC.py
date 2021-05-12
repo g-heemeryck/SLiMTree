@@ -8,7 +8,7 @@ from writeSLiM import writeSLiM
 
 class writeSLiMHPC(writeSLiM):
     #Write code to add a new population to the simulation by writing a new script for that population
-    def write_subpop(self, population_parameters, ignore):
+    def write_subpop(self, population_parameters):
         
         #Create a new script and batch file for the population
         batch_file = open(self.general_output_filename + "_" + population_parameters["pop_name"] + ".sh", "w")
