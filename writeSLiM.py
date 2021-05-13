@@ -24,13 +24,13 @@ class writeSLiM:
         self.partition = partition_information[0]
         self.partition_time = partition_information[1]
         self.repeated_commands_booleans = repeated_commands_booleans
-        
+
         #Set up the fitness profile and starting distribution of amino acids
         self.fitness_profile_nums = start_para_dict["fitness_profile_nums"]
         self.fitness_profiles = start_para_dict["fitness_profiles"]
         self.starting_allele_dist = start_para_dict["stationary_distributions"]
         self.amino_acids = start_para_dict["amino_acids"]
-        
+
         #Set up type of model?
         self.model_type = start_para_dict["wf_model"]
 
@@ -44,7 +44,7 @@ class writeSLiM:
         for codons in slim_codons :
             amino_acid = codons[2]
             slim_codon_number = int(codons[0])
-            
+
             if(amino_acid in self.slim_codon_dict.keys()):
                     self.slim_codon_dict[amino_acid].append(slim_codon_number)
             else:
@@ -54,7 +54,7 @@ class writeSLiM:
 
         #Write the initialize function for the SLiM script
     def write_initialize(self, population_parameters):
-        
+
         initialize_string = ("initialize() {")
 
         if (self.model_type == False): #***
@@ -63,7 +63,7 @@ class writeSLiM:
         initialize_string += ("\n\tsetSeed(" + str(random.randint(0,1000000000)) + ");" + "\n\tinitializeSLiMOptions(nucleotideBased=T);")
 
         #Starting population does not inherit parent sequence, other populations do
-        if(population_parameters["parent_pop_name"] == None):                
+        if(population_parameters["parent_pop_name"] == None):
             aa_codon_sequence = str(self.create_codon_seq())
             aa_codon_sequence_str = "c(" + aa_codon_sequence[1:len(aa_codon_sequence)-1] + ")"
             initialize_string += ("\n\tcodons = " + aa_codon_sequence_str + ";" +
@@ -75,19 +75,19 @@ class writeSLiM:
 
         initialize_string += ("\n\tmm = mmJukesCantor(" + str(population_parameters ["mutation_rate"]/3) + ");" +
                         "\n\tinitializeMutationTypeNuc(\"m1\", 0.5, \"f\", 0.0);" +
-                        "\n\tm1.convertToSubstitution = F;" + 
+                        "\n\tm1.convertToSubstitution = F;" +
                         "\n\tinitializeGenomicElementType(\"g1\", m1, 1.0, mm);" +
                         "\n\tinitializeGenomicElement(g1, 0, L-1);" +
                         "\n\tinitializeRecombinationRate("+ str(population_parameters ["recombination_rate"])+");"+
                         "\n}\n\n\n")
-        
+
         self.output_file.write(initialize_string)
-        
-        
+
+
 
     #Create an initial codon sequence to put into SLiM based on the fitness profile
     def create_codon_seq(self):
-        
+
         #Methionine - start codon
         start_codon = [14]
 
@@ -142,7 +142,7 @@ class writeSLiM:
         set_up_fitness += "\n\tsim.setValue(\"fixations_counted_p1\", 0);"
         set_up_fitness += "\n}\n\n\n"
 
-                                                                                                  
+
         self.output_file.write(set_up_fitness)
 
         #Sets up a function to return the fitness of each individual amino acid which scales stop codons by position
@@ -155,7 +155,7 @@ class writeSLiM:
         self.output_file.write(get_aa_fitness)
 
 
-        
+
         #Defining a function in SLiM which returns the fitness of the amino acid sequence
         fitness_function_string = ("function (float) get_fitness (string aa_seq_string){" +
                                 "\n\taa_seq = strsplit(aa_seq_string, sep=\"\");" +
@@ -165,18 +165,18 @@ class writeSLiM:
                                 "\n\tfitnesses = sapply(seq(0,seq_length-3), " +
                                 "\"sim.getValue(aa_seq[applyValue])[fitness_profiles[applyValue]];\");" +
                                 "\n\n\treturn product(fitnesses);\n}\n\n\n")
-                
+
         self.output_file.write(fitness_function_string)
 
 
-        
+
        #Now write out the fitness callback based on the fitness distribution
         fitness_callback_string = ("fitness(NULL) {" +
                                 "\n\tfor (g in individual.genomes){" +
                                 "\n\t\taa_seq = codonsToAminoAcids(nucleotidesToCodons(g.nucleotides()));"+
                                 "\n\t\treturn get_fitness(aa_seq);" +
                                 "\n\t}\n}\n\n\n")
-        
+
         self.output_file.write(fitness_callback_string)
 
 
@@ -192,7 +192,7 @@ class writeSLiM:
     #Write code to count substitutions, make a backup and count generations
     def write_repeated_commands(self, start_dist, end_dist, pop_name, count_subs = True, output_gens = True, backup = True):
         repeated_commands_string = str(start_dist) +":" + str(end_dist) + "late () {"
-        
+
         #Write a command to count the substitutions (identity by state)
         if (count_subs):
             repeated_commands_string += ("\n\tif(length(sim.mutations)!= 0){"
@@ -204,33 +204,33 @@ class writeSLiM:
                         "\n\t\t\tfixed_nucs = (fixed_nucs & same_nucs);\n\t\t}" +
                         "\n\n\t\tdifferent_muts = (ancestral_genome != compare_genome);" +
                         "\n\t\tnew_fixations = different_muts & fixed_nucs;" +
-                        "\n\t\tsim.setValue(\"fixations_counted_" + pop_name + 
+                        "\n\t\tsim.setValue(\"fixations_counted_" + pop_name +
                         "\", sim.getValue(\"fixations_counted_" + pop_name+ "\") + sum(new_fixations));" +
                         "\n\n\t\tancestral_genome[new_fixations] = compare_genome[new_fixations];" +
                         "\n\t\tsim.setValue(\"fixations_" + pop_name + "\", ancestral_genome);\n\t};")
-          
+
         #Write a command to output when every 100th generation has passed
         if(output_gens):
             repeated_commands_string += "\n\n\tif (sim.generation%100 == 0) {\n\t\tcatn(sim.generation);\n\t};"
-            
+
 
         #Write a command to write a backup of all individuals after every 100 generations
         if (backup):
              repeated_commands_string += ("\n\n\tif (sim.generation%100 == 0) {" +
-                        "\n\t\twriteFile(\"" + os.getcwd()+ "/backupFiles/" + pop_name + ".fasta\"," + 
+                        "\n\t\twriteFile(\"" + os.getcwd()+ "/backupFiles/" + pop_name + ".fasta\"," +
                         "(\">parent_ancestral_to_load\\n\" + sim.chromosome.ancestralNucleotides()));" +
                         "\n\t\tsim.outputFull(\"" + os.getcwd()+ "/backupFiles/" + pop_name + ".txt\");\n\t};")
-        
-        repeated_commands_string += "\n}\n\n\n"
-        
-        self.output_file.write(repeated_commands_string)
-        
 
-    
+        repeated_commands_string += "\n}\n\n\n"
+
+        self.output_file.write(repeated_commands_string)
+
+
+
     #Write code to add first population, subpopulation or completely remove population and replace with another
     def write_subpop(self, population_parameters):
-            
-                                        
+
+
         if(population_parameters["parent_pop_name"] == None):
                 self.set_up_sim(population_parameters)
         else:
@@ -243,22 +243,22 @@ class writeSLiM:
                     "\n\tsim.setValue(\"fixations_counted_"+ population_parameters["pop_name"]+"\", 0);")
 
             if(population_parameters["last_child_clade"] == True):
-                define_population_string += "\n\t" + population_parameters["parent_pop_name"]+".setSubpopulationSize(0);"    
+                define_population_string += "\n\t" + population_parameters["parent_pop_name"]+".setSubpopulationSize(0);"
 
-            define_population_string += "\n}\n\n\n" 
-                                            
+            define_population_string += "\n}\n\n\n"
+
             self.output_file.write(define_population_string)
-                
-                
+
+
         #Write the commands that are run for every simulation and the starting population
-        self.write_repeated_commands(int(population_parameters["dist_from_start"])+1, 
+        self.write_repeated_commands(int(population_parameters["dist_from_start"])+1,
                         int(population_parameters["end_dist"]), population_parameters["pop_name"],
                         self.repeated_commands_booleans[0], self.repeated_commands_booleans[1],
                         self.repeated_commands_booleans[2])
-                        
+
         #Write the end of each population
         self.write_end_pop(population_parameters)
-        
+
     #Write code to add first population, subpopulation or completely remove population and replace with another with non-Wright-Fisher models
     def write_subpop_nonwf(self, population_parameters):
         if(population_parameters["parent_pop_name"] == None):
@@ -287,7 +287,7 @@ class writeSLiM:
 
         #Write the early commands - this may need tweaking w/ the fitness algorithm
 
-        early_event = str(int(population_parameters["dist_from_start"]) + 1) + ":" + str(int(population_parameters["end_dist"])) + " early(){\n\t" + population_parameters["pop_name"] + ".fitnessScaling = 500/ " + population_parameters["pop_name"] + ".individualCount;" + "\n}\n\n\n"
+        early_event = str(int(population_parameters["dist_from_start"]) + 1) + ":" + str(int(population_parameters["end_dist"])) + " early(){\n\t" + population_parameters["pop_name"] + ".fitnessScaling = " + str(5*int(population_parameters["population_size"])) + "/ " + population_parameters["pop_name"] + ".individualCount;" + "\n}\n\n\n"
 
         self.output_file.write(early_event)
 
@@ -300,8 +300,8 @@ class writeSLiM:
 
         #Write the end of each population
         self.write_end_pop(population_parameters)
-    
-    
+
+
     #Set up the simulation by initializing everything
     def set_up_sim(self, population_parameters):
         self.output_file = open(self.general_output_filename + "_" + population_parameters["pop_name"] + ".slim" , "w")
@@ -309,47 +309,47 @@ class writeSLiM:
         #Set up the initialize and fitness functions for the new script
         self.write_initialize(population_parameters)
         self.write_fitness()
-        
+
         #Write reproduction callback if this is a non-WF model
         if (self.model_type == False):
             self.write_reproduction()
-        
+
         #Make the population and set up fitness effects
         pop_string = ("1 early() {" +
                     "\n\tsetup_fitness();" +
                     "\n\twriteFile(\"" + self.fasta_filename + "_aa.fasta\", \"\", append = F);" +
                     "\n\twriteFile(\"" + self.fasta_filename + "_nuc.fasta\", \"\", append = F);" +
                     "\n\tsim.addSubpop(\"p1\", " + str(population_parameters["population_size"]) + ");")
-        
+
         #Write code to start a fixed state from the starting nucleotide sequence
         pop_string += "\n\tsim.setValue(\"fixations_p1\", strsplit(sim.chromosome.ancestralNucleotides(),sep = \"\"));"
 
         #At the start of the sim there are no fixations counted
         pop_string += "\n\tsim.setValue(\"fixations_counted_p1\", 0);"
         pop_string += "\n}\n\n\n"
-                                            
+
         self.output_file.write(pop_string)
-        
-        
+
+
     #Write the end of a population to save the number of substitutions and output sequence data
     def write_end_pop (self, population_parameters):
         end_population_string = str(int(population_parameters["end_dist"])) + " late() {"
 
-        #If terminal clade output data 
+        #If terminal clade output data
         if(population_parameters["terminal_clade"]):
             end_population_string += self.write_terminal_output(population_parameters, pop = population_parameters["pop_name"])
-        
+
         #Write file with the substitution counts
         if(self.repeated_commands_booleans[0]):
             end_population_string += ("\n\twriteFile(\"" + os.getcwd()+ "/" + population_parameters["pop_name"] + "_fixed_mutation_counts.txt\"," +
                 "asString(sim.getValue(\"fixations_counted_" + population_parameters["pop_name"] + "\")));" +
                 "\n\twriteFile(\"" + os.getcwd()+ "/" + population_parameters["pop_name"] + "_fixed_mutations.txt\"," +
                 " paste(sim.getValue(\"fixations_" + population_parameters["pop_name"] + "\"), sep = \"\"));")
-                
-        end_population_string += "\n}\n\n\n"        
-        
+
+        end_population_string += "\n}\n\n\n"
+
         self.output_file.write(end_population_string)
- 
+
 
 
 
@@ -363,7 +363,7 @@ class writeSLiM:
 
 
         #Set up sampling of the population
-        pop_name = population_parameters["pop_name"]              
+        pop_name = population_parameters["pop_name"]
         pop_size = population_parameters["population_size"]
 
         if(self.sample_size == "all"):
@@ -381,13 +381,12 @@ class writeSLiM:
         for sample in pop_samples:
             fasta_string_nuc = "\">" + pop_name + "_" + str(count) + ": \\n\" + g.nucleotides()"
             fasta_string_aa = "\">" + pop_name + "_" + str(count) + ": \\n\" + codonsToAminoAcids(nucleotidesToCodons(g.nucleotides()))"
-            
-            
+
+
             terminal_output_string += ("\n\tg = "+ pop +".genomes[" + str(sample) + "];" +
                                        "\n\twriteFile(\"" + nuc_filename + "\", " + fasta_string_nuc +", append = T);" +
                                        "\n\twriteFile(\"" + aa_filename + "\", " + fasta_string_aa +", append = T);\n\n")
             count += 1
 
 
-        return terminal_output_string	
-
+        return terminal_output_string
