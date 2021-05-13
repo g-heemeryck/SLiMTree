@@ -287,8 +287,7 @@ class writeSLiM:
 
         #Write the early commands - this may need tweaking w/ the fitness algorithm
 
-        early_event = str(int(population_parameters["dist_from_start"]) + 1) + ":" + str(int(population_parameters["end_dist"])) + " early(){\n\t" + population_parameters["pop_name"] + ".fitnessScaling = "
-                    + str(5*int(population_parameters[population_size])) + "/ " + population_parameters["pop_name"] + ".individualCount;" + "\n}\n\n\n"
+        early_event = str(int(population_parameters["dist_from_start"]) + 1) + ":" + str(int(population_parameters["end_dist"])) + " early(){\n\t" + population_parameters["pop_name"] + ".fitnessScaling = " + str(5*int(population_parameters["population_size"])) + "/ " + population_parameters["pop_name"] + ".individualCount;" + "\n}\n\n\n"
 
         self.output_file.write(early_event)
 

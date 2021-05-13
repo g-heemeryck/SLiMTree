@@ -65,7 +65,7 @@ class writeSLiMHPC(writeSLiM):
                 pop_string += ("\n\tp1.setSubpopulationSize(" + str(population_parameters["population_size"]) + ");")
             else:
                 #If a non-WF model, take half of the individuals from the parent population to represent the population split.
-                pop_string += ("\n\tsample(p1.individuals, integerDiv(p1.individualCount, 2);")
+                pop_string += ("\n\tsample(p1.individuals, integerDiv(p1.individualCount, 2));")
 
             #Load population into the end of the parent population's script to start this script when parent's finishes
             parent_output_file = open(self.general_output_filename + "_" + population_parameters["parent_pop_name"] + ".slim" , "a")
@@ -85,9 +85,11 @@ class writeSLiMHPC(writeSLiM):
         self.output_file.write(pop_string)
 
 
+    #Write code for early functions in nonWF models.
     def write_early_function(self, start_dist, end_dist, population_parameters):
-        early_string = str(start_dist) + ":" + str(end_dist) + "early() {"
-        early_string += "\n\t" + population_parameters["pop_name"] + ".fitnessScaling = " + str(5*int(population_parameters["population_size"])) + "/" + population_parameters["pop_name"] + ".individualCount;"
+            early_event = str(int(population_parameters["dist_from_start"]) + 1) + ":" + str(int(population_parameters["end_dist"])) + " early(){"
+            early_event += "\n\t" + population_parameters["pop_name"] + ".fitnessScaling = " + str(5*int(population_parameters["population_size"])) + "/ " + population_parameters["pop_name"] + ".individualCount;" + "\n}\n\n\n"
+            self.output_file.write(early_event)
 
 
     #Write code to count substitutions, make a backup and count generations
