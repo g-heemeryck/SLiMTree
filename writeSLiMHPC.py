@@ -9,11 +9,11 @@ from writeSLiM import writeSLiM
 class writeSLiMHPC(writeSLiM):
     #Write code to add a new population to the simulation by writing a new script for that population
     def write_subpop(self, population_parameters):
-        
+
         #Create a new script and batch file for the population
         batch_file = open(self.general_output_filename + "_" + population_parameters["pop_name"] + ".sh", "w")
-        batch_file.write("#!/bin/sh\n\n#SBATCH -J SLiM_Simulation_" + population_parameters["pop_name"] + "\n#SBATCH -t " + self.partition_time + 
-                "\n#SBATCH -p "  + self.partition + "\n#SBATCH -o " + population_parameters["pop_name"] + ".out\n#SBATCH -e " + population_parameters["pop_name"] 
+        batch_file.write("#!/bin/sh\n\n#SBATCH -J SLiM_Simulation_" + population_parameters["pop_name"] + "\n#SBATCH -t " + self.partition_time +
+                "\n#SBATCH -p "  + self.partition + "\n#SBATCH -o " + population_parameters["pop_name"] + ".out\n#SBATCH -e " + population_parameters["pop_name"]
                 +".err\n#SBATCH -n 1" + "\n\nslim " + self.general_output_filename + "_" + population_parameters["pop_name"]+".slim")
         batch_file.close()
 
@@ -23,17 +23,22 @@ class writeSLiMHPC(writeSLiM):
         super().write_initialize(population_parameters)
         super().write_fitness()
 
+        if (self.model_type == False):
+            super().write_reproduction()
+
         #Write the commands that are run for every simulation and the starting population
-        self.write_repeated_commands(int(population_parameters["dist_from_start"])+2, 
+        self.write_repeated_commands(int(population_parameters["dist_from_start"])+1,
                             int(population_parameters["end_dist"]), population_parameters["pop_name"],
-                            self.repeated_commands_booleans[0], self.repeated_commands_booleans[1], 
+                            self.repeated_commands_booleans[0], self.repeated_commands_booleans[1],
                             self.repeated_commands_booleans[2])
         self.write_start_pop(population_parameters)
+        if (self.model_type == False):
+            self.write_early_function(int(population_parameters["dist_from_start"]) +1, int(population_parameters["end_dist"]), population_parameters)
 
 
         #Finish writing the script
         self.write_end_sim(population_parameters)
-        self.output_file.close() 
+        self.output_file.close()
 
 
 
@@ -43,7 +48,7 @@ class writeSLiMHPC(writeSLiM):
 
         pop_string = (str(int(population_parameters["dist_from_start"])+1) + " late() {" +
                     "\n\tsetup_fitness();")
-        
+
         #If first population make the population, otherwise load from the parent
         if(population_parameters["parent_pop_name"] == None):
             pop_string += ("\n\twriteFile(\"" + self.fasta_filename + "_aa.fasta\", \"\", append = F);" +
@@ -53,8 +58,14 @@ class writeSLiMHPC(writeSLiM):
             #Write code to start a fixed state from the starting nucleotide sequence
             pop_string += "sim.setValue(\"fixations\", strsplit(sim.chromosome.ancestralNucleotides(),sep = \"\"));"
         else:
-            pop_string += ("\n\tsim.readFromPopulationFile(\"" + population_parameters["parent_pop_name"]  + ".txt\");" +
-                            "\n\tp1.setSubpopulationSize(" + str(population_parameters["population_size"]) + ");")
+            pop_string += ("\n\tsim.readFromPopulationFile(\"" + population_parameters["parent_pop_name"]  + ".txt\");")
+
+            #Set appropriate starting population size
+            if (self.model_type == True):
+                pop_string += ("\n\tp1.setSubpopulationSize(" + str(population_parameters["population_size"]) + ");")
+            else:
+                #If a non-WF model, take half of the individuals from the parent population to represent the population split.
+                pop_string += ("\n\tsample(p1.individuals, integerDiv(p1.individualCount, 2);")
 
             #Load population into the end of the parent population's script to start this script when parent's finishes
             parent_output_file = open(self.general_output_filename + "_" + population_parameters["parent_pop_name"] + ".slim" , "a")
@@ -70,14 +81,19 @@ class writeSLiMHPC(writeSLiM):
         #At the start of the sim there are no fixations counted
         pop_string += "\n\tsim.setValue(\"fixations_counted\", 0);"
         pop_string += "\n}\n\n\n"
-                                            
+
         self.output_file.write(pop_string)
-        
-        
+
+
+    def write_early_function(self, start_dist, end_dist, population_parameters):
+        early_string = str(start_dist) + ":" + str(end_dist) + "early() {"
+        early_string += "\n\t" + population_parameters["pop_name"] + ".fitnessScaling = " + str(5*int(population_parameters["population_size"])) + "/" + population_parameters["pop_name"] + ".individualCount;"
+
+
     #Write code to count substitutions, make a backup and count generations
     def write_repeated_commands(self, start_dist, end_dist, pop_name, count_subs = True, output_gens = True, backup = True):
         repeated_commands_string = str(start_dist) +":" + str(end_dist) + "late () {"
-        
+
         #Write a command to count the substitutions (identity by state)
         if (count_subs):
             repeated_commands_string += ("\n\tif(length(sim.mutations)!= 0){"
@@ -92,27 +108,27 @@ class writeSLiMHPC(writeSLiM):
                         "\n\t\tsim.setValue(\"fixations_counted_p1\", sim.getValue(\"fixations_counted_p1\") + sum(new_fixations));" +
                         "\n\n\t\tancestral_genome[new_fixations] = compare_genome[new_fixations];" +
                         "\n\t\tsim.setValue(\"fixations_p1\", ancestral_genome);\n\t};")
-          
+
         #Write a command to output when every 100th generation has passed
         if(output_gens):
             repeated_commands_string += "\n\n\tif (sim.generation%100 == 0) {\n\t\tcatn(sim.generation);\n\t};"
-            
+
 
         #Write a command to write a backup of all individuals after every 100 generations
         if (backup):
              repeated_commands_string += ("\n\n\tif (sim.generation%100 == 0) {" +
-                        "\n\t\twriteFile(\"" + os.getcwd()+ "/backupFiles/" + pop_name + ".fasta\"," + 
+                        "\n\t\twriteFile(\"" + os.getcwd()+ "/backupFiles/" + pop_name + ".fasta\"," +
                         "(\">parent_ancestral_to_load\\n\" + sim.chromosome.ancestralNucleotides()));" +
                         "\n\t\tsim.outputFull(\"" + os.getcwd()+ "/backupFiles/" + pop_name + ".txt\");\n\t};")
-        
+
         repeated_commands_string += "\n}\n\n\n"
-        
+
         self.output_file.write(repeated_commands_string)
 
 
     #Write the closing statements to end the simulation and either allow for starting of subsequent simulations or output data (depending on terminal status)
     def write_end_sim(self, population_parameters):
-        
+
         end_population_string = str(int(population_parameters["end_dist"]) + 1) + " late() {"
 
         #If terminal clade output data otherwise create data to be loaded into scripts of the clades children
@@ -137,12 +153,8 @@ class writeSLiMHPC(writeSLiM):
             end_population_string += ("\n\n\tsystem(\"rm " + population_parameters["parent_pop_name"] + ".txt\");" +
                                       "\n\tsystem(\"rm " + population_parameters["parent_pop_name"] + ".fasta\");")
 
-        
+
         if(population_parameters["terminal_clade"]):
             end_population_string += "\n}"
-        
+
         self.output_file.write(end_population_string)
-
-
-
-    
