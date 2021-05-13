@@ -64,8 +64,13 @@ class writeSLiMHPC(writeSLiM):
             if (self.model_type == True):
                 pop_string += ("\n\tp1.setSubpopulationSize(" + str(population_parameters["population_size"]) + ");")
             else:
-                #If a non-WF model, take half of the individuals from the parent population to represent the population split.
-                pop_string += ("\n\tsample(p1.individuals, integerDiv(p1.individualCount, 2));")
+                #If a non-WF model, take half of the individuals from the parent population to represent the population split according to tags assigned in previous generation.
+                if (population_parameters["last_child_clade"]):
+                    #Have population tag 1 have fitness 0.0 so they won't influence next generation
+                    pop_string += ("\n\tp1.individuals[p1.individuals.tag == 1].fitnessScaling = 0.0;")
+                else:
+                    #Have population tag 2 have fitness 0.0 so they won't influence next generation.
+                    pop_string += ("\n\tp1.individuals[p1.individuals.tag == 2].fitnessScaling = 0.0;")
 
             #Load population into the end of the parent population's script to start this script when parent's finishes
             parent_output_file = open(self.general_output_filename + "_" + population_parameters["parent_pop_name"] + ".slim" , "a")
@@ -137,6 +142,11 @@ class writeSLiMHPC(writeSLiM):
         if(population_parameters["terminal_clade"]):
             end_population_string += super().write_terminal_output(population_parameters)
         else:
+            if (self.model_type == False):
+                #Tag each individual with either 1 or 2 to go into different subpopulations. Should be split evenly.
+                end_population_string += "\n\tp1.individuals.tag = 0;\n\tsample(p1.individuals, integerDiv(p1.individualCount, 2)).tag = 1;\n\tp1.individuals[p1.individuals.tag == 0].tag = 2;"
+
+
             end_population_string += ("\n\twriteFile(\"" + population_parameters["pop_name"] +
                                       ".fasta\", (\">parent_ancestral_to_load\\n\" + sim.chromosome.ancestralNucleotides()));" +
                                       "\n\tsim.outputFull(\"" + population_parameters["pop_name"] + ".txt\");" )
