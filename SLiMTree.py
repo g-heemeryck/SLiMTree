@@ -29,7 +29,7 @@ class SLiMTree:
         clade_data = self.read_clade_data()
         if (self.data_file != None):
             self.data_file.close()
-        
+
         clade_dict_list = self.read_input_tree(clade_data)
 
         self.write_slim_code(clade_dict_list)
@@ -39,7 +39,7 @@ class SLiMTree:
     #Read input parameters from the user
     def read_user_input(self):
 
-        #Set up starting parameters dictionary 
+        #Set up starting parameters dictionary
         self.starting_parameters = {}
 
         #Parse for arguments given by the user
@@ -48,13 +48,13 @@ class SLiMTree:
                 help = 'tree file in newick format specifying the clades to simulate')
         parser.add_argument('-d','--tree_data_file', nargs = 1, type=argparse.FileType('r'),
                 help = 'file specifying population size, mutation rate, etc. for each node, see documentation')
-        parser.add_argument('-t', '--tool', type = str, required = True, 
+        parser.add_argument('-t', '--tool', type = str, required = True,
                 help = 'name of tool you would like to use. Options include SLiM-Tree, SLiM-Tree-HPC. Default = SLiM-Tree')
         parser.add_argument('-p', '--partition', type = str, help = 'partition to run SLiM-Tree HPC on')
-        parser.add_argument('-T', '--time', type = str, 
+        parser.add_argument('-T', '--time', type = str,
                 help = 'maximum time to run each simulation for - suggested time is the maxmimum time available for a partition')
-         
-        
+
+
         #Default parameters are somewhat arbitrary and should be changed for each sim
         parser.add_argument('-n','--population_size', help = 'starting population size for the simulation, default = 100', type = int, default = 100)
         parser.add_argument('-v','--mutation_rate', help = 'starting mutation rate for the simulation, default = 2.5e-6', type=float, default = 2.5e-6)
@@ -62,7 +62,7 @@ class SLiMTree:
         parser.add_argument('-r','--recombination_rate', help = 'recombination rate, default = 2.5e-8', type=float, default = 2.5e-8)
         parser.add_argument('-b','--burn_in_multiplier', help = 'value to multiply population size by for burn in, default = 10', type=float, default = 10)
         parser.add_argument('-k','--sample_size', help = 'size of sample obtained from each population at output. Input all for whole sample,  default = 10', type=str, default = "10")
-    
+
         parser.add_argument('-c','--count_subs', type = self.str2bool, default = True, const=True, nargs='?',
                 help = 'boolean specifying whether to count substitutions, turning off will speed up sims. default = True')
         parser.add_argument('-o','--output_gens', type = self.str2bool, default = True, const=True, nargs='?',
@@ -80,7 +80,7 @@ class SLiMTree:
         self.partition_data = [arguments.partition, arguments.time]
         self.repeated_command_booleans = [arguments.count_subs, arguments.output_gens, arguments.backup]
         self.simulationType = arguments.tool.translate(str.maketrans('', '', string.punctuation)).lower()
-        
+
         if (self.simulationType == "slimtreehpc" and arguments.partition == None):
             raise Exception("When using SLiMTree-HPC, partition data must be provided. Closing program.")
             sys.exit(0)
@@ -92,25 +92,25 @@ class SLiMTree:
         self.starting_parameters["recombination_rate"] = arguments.recombination_rate
         self.starting_parameters["burn_in"] = arguments.burn_in_multiplier * arguments.population_size
         self.starting_parameters["sample_size"] = arguments.sample_size
-        
+
         self.starting_parameters["wf_model"] = arguments.wright_fisher_model
 
         #Set up the filenames for file io
-        input_file_start = os.getcwd() + '/' + self.input_file.split('.')[0] 
+        input_file_start = os.getcwd() + '/' + self.input_file.split('.')[0]
         self.starting_parameters["tree_filename"] = input_file_start + "_phylogeny.png"
         self.starting_parameters["fasta_filename"] = input_file_start
 
         if(arguments.tree_data_file != None):
             self.data_file = arguments.tree_data_file[0]
         else:
-            self.data_file = None  
+            self.data_file = None
 
 
         #Set up the output of scripts to a single folder
         split_starting_file = input_file_start.split('/')
         output_files_directory = "/".join(split_starting_file[0:(len(split_starting_file)-1)]) + "/slimScripts/"
         backup_files_directory = "/".join(split_starting_file[0:(len(split_starting_file)-1)]) + "/backupFiles/"
-         
+
 
         try:
             os.mkdir(output_files_directory)
@@ -121,20 +121,20 @@ class SLiMTree:
         self.starting_parameters["output_file"] = output_files_directory + "/" + split_starting_file[-1]
 
 
-     
+
         #Save starting parameters and value of theta to a file for later reference
         theta = 4*arguments.mutation_rate*arguments.population_size
 
         parameter_file = open(input_file_start + "_parameters.txt", 'w')
         parameter_file.write("Simulation parameters\n\n")
-        
+
         for key, value in self.starting_parameters.items():
             #Don't need to record these filenames as they are not yet complete
             if(key in ['fasta_filename', 'tree_filename', 'output_file']):
                 continue
-            
+
             parameter_file.write('%s:%s\n' % (key, value))
-            
+
         parameter_file.write("theta: " + str(theta))
         parameter_file.close()
 
@@ -162,7 +162,7 @@ class SLiMTree:
             #print("Fitness profile length: " + str(fitness_length))
             fitness_profile_nums = random.choices(range(fitness_length),k=self.starting_parameters["genome_length"]-2 ) # HERE ***
             #print("Fitness profile nums: " + str(fitness_profile_nums))
-        
+
 
         with open(os.path.dirname(os.path.realpath(__file__)) + '/fitnessDataFiles/table_stationary_distributions.csv', newline='') as stationary_file:
             reader = csv.reader(stationary_file)
@@ -180,7 +180,7 @@ class SLiMTree:
         amino_acids = (["A", "C", "D", "E", "F", "G", "H", "I", "K", "L", "M", "N"] +
                                ["P", "Q", "R", "S", "T", "V", "W", "Y", "X"])
         fitness_profiles = {}
-        
+
         for amino_acid_num in range(len(amino_acids)):
                 aa = amino_acids[amino_acid_num]
                 fitness_profiles[aa] = fitness_dist[amino_acid_num]
@@ -205,7 +205,7 @@ class SLiMTree:
             'mutation_rate': 'mutation_rate',
             'population_size': 'population_size',
             'recombination_rate': 'recombination_rate'
-            
+
         }
 
         if(self.data_file == None):
@@ -224,9 +224,9 @@ class SLiMTree:
                 elif(line[0] == '-'):
                     data_label = line[1]
                     data_value = line.split(' ')[1]
-                    
+
                     data_for_node[data_translation_dict[data_label]] = data_value
-                
+
                 line = self.data_file.readline()
             return(data)
 
@@ -236,7 +236,7 @@ class SLiMTree:
     def read_input_tree(self, clade_data):
 
         self.pop_num = 0
-        
+
         phylogeny = Phylo.read(self.input_file,"newick")
 
         #Figure out how long the simulation is going to run for
@@ -262,11 +262,11 @@ class SLiMTree:
         #Sort clade dict list by the distance from the start of the simulation so that it works properly
         #in SLiM
 
-        clade_dict_list = sorted(clade_dict_list, key=lambda k: k["dist_from_start"]) 
-        
+        clade_dict_list = sorted(clade_dict_list, key=lambda k: k["dist_from_start"])
+
     ##    print(clade_dict_list)
 
-        
+
         return (clade_dict_list)
 
 
@@ -277,7 +277,7 @@ class SLiMTree:
     def recurse_through_clades(self, current_clade, parent_clade_dict, clade_data, phylogeny):
         clade_dict_list = self.get_clade_data(current_clade,parent_clade_dict,clade_data, phylogeny)
         clade_dict = clade_dict_list[0]
-        
+
         #Make list of clades from data
         if (len(clade_dict["child_clades"])==0):
             return (clade_dict_list)
@@ -287,8 +287,8 @@ class SLiMTree:
             for child_clade in clade_dict["child_clades"]:
                 child_clade_dict = self.recurse_through_clades(child_clade, clade_dict,clade_data, phylogeny)
                 list_of_child_clades = list_of_child_clades + child_clade_dict
-            
-            return clade_dict_list + list_of_child_clades       
+
+            return clade_dict_list + list_of_child_clades
 
 
 
@@ -338,31 +338,31 @@ class SLiMTree:
             last_child_clade = False
         else:
             last_child_clade = clade == parents_children[-1]
-        
-        
+
+
 
         #Set up the dictionary of values for the clade
         clade_dict = {
             "pop_name": pop_name,
             "parent_pop_name" : parent_clade_dict["pop_name"],
-            "child_clades" : clade.clades, 
+            "child_clades" : clade.clades,
             "mutation_rate" : mut_rate,
             "population_size" : pop_size,
-            "recombination_rate": rec_rate, 
+            "recombination_rate": rec_rate,
             "dist_from_start" : dist_from_start,
             "end_dist": self.starting_parameters["burn_in"]  + phylogeny.distance(clade),
             "terminal_clade" : clade.clades == [],
             "last_child_clade" : last_child_clade
         }
-        
+
         return [clade_dict]
 
 
     #Using the dictionary of the data from the clades, write slim code to represent the phylogeny
     def write_slim_code (self, clade_dict_list):
-        
+
         #Open SLiM writer based on tool type and write the initialize statement
-        print(self.simulationType)        
+        print(self.simulationType)
 
         if(self.simulationType == "slimtree"):
             SLiM_Writer = writeSLiM(self.starting_parameters, self.partition_data, self.repeated_command_booleans)
