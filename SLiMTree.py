@@ -70,6 +70,8 @@ class SLiMTree:
         parser.add_argument('-B','--backup', type = self.str2bool, default = True, const=True, nargs='?',
                 help = 'boolean specifying whether to backup simulations, turning off will save space. default = True')
 
+        parser.add_argument('-w', '--wright_fisher_model', type = self.str2bool, default=True, const=True, nargs='?',
+                help = 'boolean specifying whether this is a wright-fisher model or non-wright-fisher model. default = True')
 
         #Set up important variables
         arguments = parser.parse_args()
@@ -90,6 +92,8 @@ class SLiMTree:
         self.starting_parameters["recombination_rate"] = arguments.recombination_rate
         self.starting_parameters["burn_in"] = arguments.burn_in_multiplier * arguments.population_size
         self.starting_parameters["sample_size"] = arguments.sample_size
+        
+        self.starting_parameters["wf_model"] = arguments.wright_fisher_model
 
         #Set up the filenames for file io
         input_file_start = os.getcwd() + '/' + self.input_file.split('.')[0] 
@@ -368,8 +372,12 @@ class SLiMTree:
             raise NameError("Invalid tool type. Please specify a tool as SLiM-Tree or SLiM-Tree-HPC")
 
         #Write a script for each clade which will be run sequentially
-        for clade in clade_dict_list:
-            SLiM_Writer.write_subpop(clade)
+        if (self.starting_parameters["wf_model"]): #If this is a Wright-Fisher model, use a different write_subpop function
+            for clade in clade_dict_list:
+                SLiM_Writer.write_subpop(clade)
+        else:
+            for clade in clade_dict_list:
+                SLiM_Writer.write_subpop_nonwf(clade);
 
         #Start the SLiM code to run
         if(self.simulationType == "slimtree"):
