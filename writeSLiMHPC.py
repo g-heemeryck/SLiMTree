@@ -118,7 +118,7 @@ class writeSLiMHPC(writeSLiM):
     #Write code for early functions in nonWF models.
     def write_early_function(self, start_dist, end_dist, population_parameters):
             early_event = str(int(population_parameters["dist_from_start"]) + 2) + ":" + str(int(population_parameters["end_dist"]) + 1) + " early(){"
-            early_event += "\n\tp1.fitnessScaling = " + str(5*int(population_parameters["population_size"])) + "/ p1.individualCount;" + "\n}\n\n\n"
+            early_event += "\n\tp1.fitnessScaling = " + str(int(population_parameters["population_size"])) + "/ p1.individualCount;" + "\n}\n\n\n"
             self.output_file.write(early_event)
 
 
