@@ -312,7 +312,7 @@ class SLiMTree:
                 if('population_size' in current_clade_data.keys()):
                     pop_size = int(current_clade_data['population_size'])
                 if('recombination_rate' in current_clade_data.keys()):
-                    rec_rate = int(current_clade_data['recombination_rate'])
+                    rec_rate = float(current_clade_data['recombination_rate'])
 
         #Figure out what population name is for self and assign clade name appropriately
         self.pop_num += 1
