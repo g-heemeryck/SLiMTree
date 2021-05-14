@@ -52,7 +52,7 @@ class SLiMTree:
                 help = 'name of tool you would like to use. Options include SLiM-Tree, SLiM-Tree-HPC. Default = SLiM-Tree')
         parser.add_argument('-p', '--partition', type = str, help = 'partition to run SLiM-Tree HPC on')
         parser.add_argument('-T', '--time', type = str,
-                help = 'maximum time to run each simulation for - suggested time is the maxmimum time available for a partition')
+                help = 'maximum time to run each simulation for - suggested time is the maximum time available for a partition')
 
 
         #Default parameters are somewhat arbitrary and should be changed for each sim
@@ -202,10 +202,11 @@ class SLiMTree:
             'v': 'mutation_rate',
             'n': 'population_size',
             'r': 'recombination_rate',
+            'k': 'sample_size',
             'mutation_rate': 'mutation_rate',
             'population_size': 'population_size',
-            'recombination_rate': 'recombination_rate'
-
+            'recombination_rate': 'recombination_rate',
+            'sample_size': 'sample_size'
         }
 
         if(self.data_file == None):
@@ -249,7 +250,8 @@ class SLiMTree:
             "child_clades" : None,
             "mutation_rate" : self.starting_parameters["mutation_rate"],
             "population_size" : self.starting_parameters["population_size"],
-            "recombination_rate" : self.starting_parameters["recombination_rate"]
+            "recombination_rate" : self.starting_parameters["recombination_rate"],
+            "sample_size": self.starting_parameters["sample_size"]
         }
 
         try:
@@ -300,6 +302,7 @@ class SLiMTree:
         mut_rate = parent_clade_dict["mutation_rate"]
         pop_size = parent_clade_dict["population_size"]
         rec_rate = parent_clade_dict["recombination_rate"]
+        samp_size = parent_clade_dict["sample_size"]
 
         #Change mutation rate, population size and recombination rate if specified by user
         if(clade_data != None):
@@ -313,6 +316,8 @@ class SLiMTree:
                     pop_size = int(current_clade_data['population_size'])
                 if('recombination_rate' in current_clade_data.keys()):
                     rec_rate = float(current_clade_data['recombination_rate'])
+                if('sample_size' in current_clade_data.keys()):
+                    samp_size = current_clade_data['sample_size']
 
         #Figure out what population name is for self and assign clade name appropriately
         self.pop_num += 1
@@ -339,8 +344,6 @@ class SLiMTree:
         else:
             last_child_clade = clade == parents_children[-1]
 
-
-
         #Set up the dictionary of values for the clade
         clade_dict = {
             "pop_name": pop_name,
@@ -352,7 +355,8 @@ class SLiMTree:
             "dist_from_start" : dist_from_start,
             "end_dist": self.starting_parameters["burn_in"]  + phylogeny.distance(clade),
             "terminal_clade" : clade.clades == [],
-            "last_child_clade" : last_child_clade
+            "last_child_clade" : last_child_clade,
+            "sample_size": samp_size
         }
 
         return [clade_dict]

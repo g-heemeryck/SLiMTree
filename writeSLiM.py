@@ -19,7 +19,6 @@ class writeSLiM:
         #Set up variables that remain constant for every part of the simulation
         self.general_output_filename = start_para_dict["output_file"]
         self.genome_length = start_para_dict["genome_length"]
-        self.sample_size = start_para_dict["sample_size"]
         self.fasta_filename = start_para_dict["fasta_filename"]
         self.partition = partition_information[0]
         self.partition_time = partition_information[1]
@@ -365,11 +364,12 @@ class writeSLiM:
         #Set up sampling of the population
         pop_name = population_parameters["pop_name"]
         pop_size = population_parameters["population_size"]
+        samp_size = population_parameters["sample_size"]
 
-        if(self.sample_size == "all"):
+        if(samp_size == "all"):
             pop_samples = list(range(pop_size))
-        elif(int(self.sample_size) < pop_size):
-            pop_samples = random.sample(list(range(pop_size)), int(self.sample_size))
+        elif(int(samp_size) < pop_size):
+            pop_samples = random.sample(list(range(pop_size)), int(samp_size))
         else:
             pop_samples = list(range(pop_size))
 
