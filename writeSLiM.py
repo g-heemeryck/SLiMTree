@@ -164,8 +164,8 @@ class writeSLiM:
                                 "\n\n\taa_seq = aa_seq[1:(seq_length-2)];" +
                                 "\n\tfitnesses = sapply(seq(0,seq_length-3), " +
                                 "\"sim.getValue(aa_seq[applyValue])[fitness_profiles[applyValue]];\");" +
-                                "\n\n\treturn product(fitnesses);\n}\n\n\n")
-
+                                "\n\n\treturn sum(fitnesses)/"+ str(int(self.genome_length))+";\n}\n\n\n")
+                                
         self.output_file.write(fitness_function_string)
 
 
@@ -287,7 +287,7 @@ class writeSLiM:
 
         #Write the early commands - this may need tweaking w/ the fitness algorithm
 
-        early_event = str(int(population_parameters["dist_from_start"]) + 1) + ":" + str(int(population_parameters["end_dist"])) + " early(){\n\t" + population_parameters["pop_name"] + ".fitnessScaling = " + str(5*int(population_parameters["population_size"])) + "/ " + population_parameters["pop_name"] + ".individualCount;" + "\n}\n\n\n"
+        early_event = str(int(population_parameters["dist_from_start"]) + 1) + ":" + str(int(population_parameters["end_dist"])) + " early(){\n\t" + population_parameters["pop_name"] + ".fitnessScaling = " + str(int(population_parameters["population_size"])) + "/ " + population_parameters["pop_name"] + ".individualCount;" + "\n}\n\n\n"
 
         self.output_file.write(early_event)
 
