@@ -81,8 +81,8 @@ class SLiMTree:
         self.repeated_command_booleans = [arguments.count_subs, arguments.output_gens, arguments.backup]
         self.simulationType = arguments.tool.translate(str.maketrans('', '', string.punctuation)).lower()
 
-        if (self.simulationType == "slimtreehpc" and arguments.partition == None):
-            raise Exception("When using SLiMTree-HPC, partition data must be provided. Closing program.")
+        if (self.simulationType == "slimtreehpc" and (arguments.partition == None or arguments.time == None)):
+            print("When using SLiM-Tree-HPC, partition and time data must be provided. Closing program.")
             sys.exit(0)
 
         #Set up the starting parameters
@@ -373,8 +373,9 @@ class SLiMTree:
         elif(self.simulationType == "slimtreehpc"):
             SLiM_Writer = writeSLiMHPC(self.starting_parameters, self.partition_data, self.repeated_command_booleans)
         else:
-            raise NameError("Invalid tool type. Please specify a tool as SLiM-Tree or SLiM-Tree-HPC")
-
+            print ("Invalid tool type. Please specify a tool as SLiM-Tree or SLiM-Tree-HPC. Program closing")
+            sys.exit(0)
+            
         #Write a script for each clade which will be run sequentially
         if (self.starting_parameters["wf_model"]): #If this is a Wright-Fisher model, use a different write_subpop function
             for clade in clade_dict_list:
