@@ -9,25 +9,24 @@ from writeSLiM import writeSLiM
 class writeSLiMHPC(writeSLiM):
     #Write code to add a new population to the simulation by writing a new script for that population
     def write_subpop(self, population_parameters):
+        pop_name = population_parameters["pop_name"]
+
 
         #Create a new script and batch file for the population
-        batch_file = open(self.general_output_filename + "_" + population_parameters["pop_name"] + ".sh", "w")
-        batch_file.write("#!/bin/sh\n\n#SBATCH -J SLiM_Simulation_" + population_parameters["pop_name"] + "\n#SBATCH -t " + self.partition_time +
-                "\n#SBATCH -p "  + self.partition + "\n#SBATCH -o " + population_parameters["pop_name"] + ".out\n#SBATCH -e " + population_parameters["pop_name"]
-                +".err\n#SBATCH -n 1" + "\n\nslim " + self.general_output_filename + "_" + population_parameters["pop_name"]+".slim")
+        batch_file = open(self.general_output_filename + "_" + pop_name + ".sh", "w")
+        batch_file.write("#!/bin/sh\n\n#SBATCH -J SLiM_Simulation_" + pop_name + "\n#SBATCH -t " + population_parameters["time"] +
+                "\n#SBATCH -p "  + population_parameters["partition"] + "\n#SBATCH -o " + pop_name + ".out\n#SBATCH -e " + pop_name +
+                ".err\n#SBATCH -n 1" + "\n\nslim " + self.general_output_filename + "_" + pop_name +".slim")
         batch_file.close()
 
-        self.output_file = open(self.general_output_filename + "_" + population_parameters["pop_name"] + ".slim" , "w")
+        self.output_file = open(self.general_output_filename + "_" + pop_name + ".slim" , "w")
 
         #Set up the initialize and fitness functions for the new script
         super().write_initialize(population_parameters)
         super().write_fitness()
 
         #Write the commands that are run for every simulation and the starting population
-        self.write_repeated_commands(int(population_parameters["dist_from_start"])+1,
-                            int(population_parameters["end_dist"]), population_parameters["pop_name"],
-                            self.repeated_commands_booleans[0], self.repeated_commands_booleans[1],
-                            self.repeated_commands_booleans[2])
+        self.write_repeated_commands(population_parameters)
         self.write_start_pop(population_parameters)
 
 
@@ -35,15 +34,20 @@ class writeSLiMHPC(writeSLiM):
         self.write_end_sim(population_parameters)
         self.output_file.close()
 
+
+
+
     def write_subpop_nonwf(self, population_parameters):
+        pop_name = population_parameters["pop_name"]
+    
         #Create a new script and batch file for the population
-        batch_file = open(self.general_output_filename + "_" + population_parameters["pop_name"] + ".sh", "w")
-        batch_file.write("#!/bin/sh\n\n#SBATCH -J SLiM_Simulation_" + population_parameters["pop_name"] + "\n#SBATCH -t " + self.partition_time +
-                "\n#SBATCH -p "  + self.partition + "\n#SBATCH -o " + population_parameters["pop_name"] + ".out\n#SBATCH -e " + population_parameters["pop_name"]
-                +".err\n#SBATCH -n 1" + "\n\nslim " + self.general_output_filename + "_" + population_parameters["pop_name"]+".slim")
+        batch_file = open(self.general_output_filename + "_" + pop_name + ".sh", "w")
+        batch_file.write("#!/bin/sh\n\n#SBATCH -J SLiM_Simulation_" + pop_name + "\n#SBATCH -t " + population_parameters["time"] +
+                "\n#SBATCH -p "  + population_parameters["partition"] + "\n#SBATCH -o " + pop_name + ".out\n#SBATCH -e " + pop_name
+                +".err\n#SBATCH -n 1" + "\n\nslim " + self.general_output_filename + "_" + pop_name+".slim")
         batch_file.close()
 
-        self.output_file = open(self.general_output_filename + "_" + population_parameters["pop_name"] + ".slim" , "w")
+        self.output_file = open(self.general_output_filename + "_" + pop_name + ".slim" , "w")
 
         #Set up the initialize and fitness functions for the new script
         super().write_initialize(population_parameters)
@@ -52,10 +56,7 @@ class writeSLiMHPC(writeSLiM):
         super().write_reproduction()
 
         #Write the commands that are run for every simulation and the starting population
-        self.write_repeated_commands(int(population_parameters["dist_from_start"])+1,
-                            int(population_parameters["end_dist"]), population_parameters["pop_name"],
-                            self.repeated_commands_booleans[0], self.repeated_commands_booleans[1],
-                            self.repeated_commands_booleans[2])
+        self.write_repeated_commands(population_parameters)
         self.write_start_pop(population_parameters)
 
         self.write_early_function(int(population_parameters["dist_from_start"]) +1, int(population_parameters["end_dist"]), population_parameters)
@@ -123,11 +124,16 @@ class writeSLiMHPC(writeSLiM):
 
 
     #Write code to count substitutions, make a backup and count generations
-    def write_repeated_commands(self, start_dist, end_dist, pop_name, count_subs = True, output_gens = True, backup = True):
+    def write_repeated_commands(self, population_parameters):
+        #Set up variables for repeated commands
+        start_dist = int(population_parameters["dist_from_start"])+1
+        end_dist = int(population_parameters["end_dist"])
+        pop_name =  population_parameters["pop_name"]
+        
         repeated_commands_string = str(start_dist) +":" + str(end_dist) + "late () {"
 
         #Write a command to count the substitutions (identity by state)
-        if (count_subs):
+        if (population_parameters["count_subs"]):
             repeated_commands_string += ("\n\tif(length(sim.mutations)!= 0){"
                         "\n\t\tancestral_genome = sim.getValue(\"fixations_p1\");" +
                         "\n\t\tcompare_genome = strsplit(p1.genomes[0].nucleotides(), sep = \'\');"+
@@ -142,12 +148,12 @@ class writeSLiMHPC(writeSLiM):
                         "\n\t\tsim.setValue(\"fixations_p1\", ancestral_genome);\n\t};")
 
         #Write a command to output when every 100th generation has passed
-        if(output_gens):
+        if(population_parameters["output_gens"]):
             repeated_commands_string += "\n\n\tif (sim.generation%100 == 0) {\n\t\tcatn(sim.generation);\n\t};"
 
 
         #Write a command to write a backup of all individuals after every 100 generations
-        if (backup):
+        if (population_parameters["backup"]):
              repeated_commands_string += ("\n\n\tif (sim.generation%100 == 0) {" +
                         "\n\t\twriteFile(\"" + os.getcwd()+ "/backupFiles/" + pop_name + ".fasta\"," +
                         "(\">parent_ancestral_to_load\\n\" + sim.chromosome.ancestralNucleotides()));" +

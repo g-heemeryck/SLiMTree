@@ -48,10 +48,10 @@ class SLiMTree:
                 help = 'tree file in newick format specifying the clades to simulate')
         parser.add_argument('-d','--tree_data_file', nargs = 1, type=argparse.FileType('r'),
                 help = 'file specifying population size, mutation rate, etc. for each node, see documentation')
-        parser.add_argument('-t', '--tool', type = str, required = True,
+        parser.add_argument('-T', '--tool', type = str, required = True,
                 help = 'name of tool you would like to use. Options include SLiM-Tree, SLiM-Tree-HPC. Default = SLiM-Tree')
         parser.add_argument('-p', '--partition', type = str, help = 'partition to run SLiM-Tree HPC on')
-        parser.add_argument('-T', '--time', type = str,
+        parser.add_argument('-t', '--time', type = str,
                 help = 'maximum time to run each simulation for - suggested time is the maximum time available for a partition')
 
 
@@ -73,14 +73,14 @@ class SLiMTree:
         parser.add_argument('-w', '--wright_fisher_model', type = self.str2bool, default=True, const=True, nargs='?',
                 help = 'boolean specifying whether this is a wright-fisher model or non-wright-fisher model. default = True')
 
-        #Set up important variables
+        #Get arguments from user
         arguments = parser.parse_args()
 
+        #Set up tree
         self.input_file = arguments.input_tree[0]
-        self.partition_data = [arguments.partition, arguments.time]
-        self.repeated_command_booleans = [arguments.count_subs, arguments.output_gens, arguments.backup]
+        
+        #Get simulation type and ensure that required arguments are given for simulation type
         self.simulationType = arguments.tool.translate(str.maketrans('', '', string.punctuation)).lower()
-
         if (self.simulationType == "slimtreehpc" and (arguments.partition == None or arguments.time == None)):
             print("When using SLiM-Tree-HPC, partition and time data must be provided. Closing program.")
             sys.exit(0)
@@ -94,6 +94,13 @@ class SLiMTree:
         self.starting_parameters["sample_size"] = arguments.sample_size
 
         self.starting_parameters["wf_model"] = arguments.wright_fisher_model
+        
+        self.starting_parameters["partition"] = arguments.partition
+        self.starting_parameters["time"] = arguments.time
+        
+        self.starting_parameters["count_subs"] = arguments.count_subs
+        self.starting_parameters["output_gens"] = arguments.output_gens
+        self.starting_parameters["backup"] = arguments.backup
 
         #Set up the filenames for file io
         input_file_start = os.getcwd() + '/' + self.input_file.split('.')[0]
@@ -203,10 +210,21 @@ class SLiMTree:
             'n': 'population_size',
             'r': 'recombination_rate',
             'k': 'sample_size',
+            'p': 'partition',
+            't': 'time',
+            'c': 'count_subs',
+            'o': 'output_gens',
+            'B': 'backup',
             'mutation_rate': 'mutation_rate',
             'population_size': 'population_size',
             'recombination_rate': 'recombination_rate',
-            'sample_size': 'sample_size'
+            'sample_size': 'sample_size',
+            'partition': 'partition',
+            'time': 'time',
+            'count_subs': 'count_subs',
+            'output_gens': 'output_gens',
+            'backup': 'backup'
+            
         }
 
         if(self.data_file == None):
@@ -251,7 +269,12 @@ class SLiMTree:
             "mutation_rate" : self.starting_parameters["mutation_rate"],
             "population_size" : self.starting_parameters["population_size"],
             "recombination_rate" : self.starting_parameters["recombination_rate"],
-            "sample_size": self.starting_parameters["sample_size"]
+            "sample_size": self.starting_parameters["sample_size"],
+            "partition": self.starting_parameters["partition"],
+            "time" : self.starting_parameters["time"],
+            "count_subs" : self.starting_parameters["count_subs"],
+            "output_gens" : self.starting_parameters["output_gens"],
+            "backup" : self.starting_parameters["backup"]
         }
 
         try:
@@ -265,8 +288,6 @@ class SLiMTree:
         #in SLiM
 
         clade_dict_list = sorted(clade_dict_list, key=lambda k: k["dist_from_start"])
-
-    ##    print(clade_dict_list)
 
 
         return (clade_dict_list)
@@ -298,13 +319,18 @@ class SLiMTree:
     #Set up data such as clade name, mutation rate, population size, etc. for a clade
     def get_clade_data (self, clade, parent_clade_dict, clade_data, phylogeny):
 
-        #Set up the default mutation rate, population size and recombination rate based on the parent
+        #Set up the default parameters based on the parent
         mut_rate = parent_clade_dict["mutation_rate"]
         pop_size = parent_clade_dict["population_size"]
         rec_rate = parent_clade_dict["recombination_rate"]
         samp_size = parent_clade_dict["sample_size"]
+        part = parent_clade_dict["partition"]
+        time = parent_clade_dict["time"]
+        subs = parent_clade_dict["count_subs"]
+        gens = parent_clade_dict["output_gens"]
+        backup = parent_clade_dict["backup"]
 
-        #Change mutation rate, population size and recombination rate if specified by user
+        #Change parameters if specified by user
         if(clade_data != None):
             clade_name = clade.name
             if(clade_name in clade_data.keys()):
@@ -317,7 +343,18 @@ class SLiMTree:
                 if('recombination_rate' in current_clade_data.keys()):
                     rec_rate = float(current_clade_data['recombination_rate'])
                 if('sample_size' in current_clade_data.keys()):
-                    samp_size = current_clade_data['sample_size']
+                    samp_size = int(current_clade_data['sample_size'])
+                if('partition' in current_clade_data.keys()):
+                    part = current_clade_data['partition']
+                if('time' in current_clade_data.keys()):
+                    time = current_clade_data['time']
+                if('count_subs' in current_clade_data.keys()):
+                    subs = self.str2bool(current_clade_data['count_subs'])
+                if('output_gens' in current_clade_data.keys()):
+                    gens = self.str2bool(current_clade_data['output_gens'])
+                if('backup' in current_clade_data.keys()):
+                    backup = self.str2bool(current_clade_data['backup'])
+                
 
         #Figure out what population name is for self and assign clade name appropriately
         self.pop_num += 1
@@ -356,7 +393,12 @@ class SLiMTree:
             "end_dist": self.starting_parameters["burn_in"]  + phylogeny.distance(clade),
             "terminal_clade" : clade.clades == [],
             "last_child_clade" : last_child_clade,
-            "sample_size": samp_size
+            "sample_size": samp_size,
+            "partition": part, 
+            "time" : time,
+            "count_subs" : subs,
+            "output_gens" : gens,
+            "backup" : backup 
         }
 
         return [clade_dict]
@@ -369,9 +411,9 @@ class SLiMTree:
         print(self.simulationType)
 
         if(self.simulationType == "slimtree"):
-            SLiM_Writer = writeSLiM(self.starting_parameters, self.partition_data, self.repeated_command_booleans)
+            SLiM_Writer = writeSLiM(self.starting_parameters)
         elif(self.simulationType == "slimtreehpc"):
-            SLiM_Writer = writeSLiMHPC(self.starting_parameters, self.partition_data, self.repeated_command_booleans)
+            SLiM_Writer = writeSLiMHPC(self.starting_parameters)
         else:
             print ("Invalid tool type. Please specify a tool as SLiM-Tree or SLiM-Tree-HPC. Program closing")
             sys.exit(0)
