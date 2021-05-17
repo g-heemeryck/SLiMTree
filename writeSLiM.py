@@ -160,7 +160,7 @@ class writeSLiM:
                                 "\n\n\taa_seq = aa_seq[1:(seq_length-2)];" +
                                 "\n\tfitnesses = sapply(seq(0,seq_length-3), " +
                                 "\"sim.getValue(aa_seq[applyValue])[fitness_profiles[applyValue]];\");" +
-                                "\n\n\treturn sum(fitnesses)/"+ str(int(self.genome_length))+";\n}\n\n\n")
+                                "\n\n\treturn product(fitnesses);\n}\n\n\n")
                                 
         self.output_file.write(fitness_function_string)
 
