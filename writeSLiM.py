@@ -14,15 +14,12 @@ import numpy as np
 class writeSLiM:
 
     #Initialize required parameters
-    def __init__(self, start_para_dict, partition_information, repeated_commands_booleans):
+    def __init__(self, start_para_dict):
 
         #Set up variables that remain constant for every part of the simulation
         self.general_output_filename = start_para_dict["output_file"]
         self.genome_length = start_para_dict["genome_length"]
         self.fasta_filename = start_para_dict["fasta_filename"]
-        self.partition = partition_information[0]
-        self.partition_time = partition_information[1]
-        self.repeated_commands_booleans = repeated_commands_booleans
 
         #Set up the fitness profile and starting distribution of amino acids
         self.fitness_profile_nums = start_para_dict["fitness_profile_nums"]
@@ -189,11 +186,16 @@ class writeSLiM:
         self.output_file.write(reproduction_string)
 
     #Write code to count substitutions, make a backup and count generations
-    def write_repeated_commands(self, start_dist, end_dist, pop_name, count_subs = True, output_gens = True, backup = True):
+    def write_repeated_commands(self, population_parameters):
+        #Set up variables for repeated commands
+        start_dist = int(population_parameters["dist_from_start"])+1
+        end_dist = int(population_parameters["end_dist"])
+        pop_name =  population_parameters["pop_name"]
+        
         repeated_commands_string = str(start_dist) +":" + str(end_dist) + "late () {"
 
         #Write a command to count the substitutions (identity by state)
-        if (count_subs):
+        if (population_parameters["count_subs"]):
             repeated_commands_string += ("\n\tif(length(sim.mutations)!= 0){"
                         "\n\t\tancestral_genome = sim.getValue(\"fixations_" + pop_name + "\");" +
                         "\n\t\tcompare_genome = strsplit(" + pop_name + ".genomes[0].nucleotides(), sep = \'\');"+
@@ -209,12 +211,12 @@ class writeSLiM:
                         "\n\t\tsim.setValue(\"fixations_" + pop_name + "\", ancestral_genome);\n\t};")
 
         #Write a command to output when every 100th generation has passed
-        if(output_gens):
+        if(population_parameters["output_gens"]):
             repeated_commands_string += "\n\n\tif (sim.generation%100 == 0) {\n\t\tcatn(sim.generation);\n\t};"
 
 
         #Write a command to write a backup of all individuals after every 100 generations
-        if (backup):
+        if (population_parameters["backup"]):
              repeated_commands_string += ("\n\n\tif (sim.generation%100 == 0) {" +
                         "\n\t\twriteFile(\"" + os.getcwd()+ "/backupFiles/" + pop_name + ".fasta\"," +
                         "(\">parent_ancestral_to_load\\n\" + sim.chromosome.ancestralNucleotides()));" +
@@ -250,10 +252,7 @@ class writeSLiM:
 
 
         #Write the commands that are run for every simulation and the starting population
-        self.write_repeated_commands(int(population_parameters["dist_from_start"])+1,
-                        int(population_parameters["end_dist"]), population_parameters["pop_name"],
-                        self.repeated_commands_booleans[0], self.repeated_commands_booleans[1],
-                        self.repeated_commands_booleans[2])
+        self.write_repeated_commands(population_parameters)
 
         #Write the end of each population
         self.write_end_pop(population_parameters)
@@ -292,10 +291,7 @@ class writeSLiM:
 
 
         #Write the commands that are run for every simulation and the starting population
-        self.write_repeated_commands(int(population_parameters["dist_from_start"])+1,
-                        int(population_parameters["end_dist"]), population_parameters["pop_name"],
-                        self.repeated_commands_booleans[0], self.repeated_commands_booleans[1],
-                        self.repeated_commands_booleans[2])
+        self.write_repeated_commands(population_parameters)
 
         #Write the end of each population
         self.write_end_pop(population_parameters)
@@ -339,7 +335,7 @@ class writeSLiM:
             end_population_string += self.write_terminal_output(population_parameters, pop = population_parameters["pop_name"])
 
         #Write file with the substitution counts
-        if(self.repeated_commands_booleans[0]):
+        if(population_parameters["count_subs"]):
             end_population_string += ("\n\twriteFile(\"" + os.getcwd()+ "/" + population_parameters["pop_name"] + "_fixed_mutation_counts.txt\"," +
                 "asString(sim.getValue(\"fixations_counted_" + population_parameters["pop_name"] + "\")));" +
                 "\n\twriteFile(\"" + os.getcwd()+ "/" + population_parameters["pop_name"] + "_fixed_mutations.txt\"," +
