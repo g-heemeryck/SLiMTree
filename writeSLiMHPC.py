@@ -104,6 +104,8 @@ class writeSLiMHPC(writeSLiM):
 
             if(population_parameters["last_child_clade"]):
                 parent_output_file.write("\n}")
+            
+            parent_output_file.close()
 
             #Write code to import in the prevouisly fixed state
             pop_string += ("sim.setValue(\"fixations\", strsplit(readFile(\""+ population_parameters["parent_pop_name"] +
