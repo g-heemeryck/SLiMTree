@@ -132,8 +132,8 @@ class SLiMTree:
 
         #Set up the output of scripts to a single folder
         split_starting_file = input_file_start.split('/')
-        output_files_directory = "/".join(split_starting_file[0:(len(split_starting_file)-1)]) + "/slimScripts/"
-        backup_files_directory = "/".join(split_starting_file[0:(len(split_starting_file)-1)]) + "/backupFiles/"
+        output_files_directory = "/".join(split_starting_file[0:(len(split_starting_file)-1)]) + "/slimScripts"
+        backup_files_directory = "/".join(split_starting_file[0:(len(split_starting_file)-1)]) + "/backupFiles"
 
 
         try:
@@ -445,6 +445,7 @@ class SLiMTree:
 
         #Start the SLiM code to run
         if(self.simulationType == "slimtree"):
+            SLiM_Writer.close_file()
             os.system("slim \"" + self.starting_parameters["output_file"] + "_p1.slim\"")
         elif(self.simulationType == "slimtreehpc"):
             os.system("sbatch \"" + self.starting_parameters["output_file"] + "_p1.sh\"")

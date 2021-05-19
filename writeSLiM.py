@@ -38,6 +38,8 @@ class writeSLiM:
         with open(os.path.dirname(os.path.realpath(__file__)) + '/fitnessDataFiles/slim_codon_nums.csv', newline='') as slim_codon_nums:
             reader = csv.reader(slim_codon_nums)
             slim_codons = list(reader)[1:]
+        
+        slim_codon_nums.close()
 
         self.slim_codon_dict = {}
 
@@ -100,6 +102,7 @@ class writeSLiM:
     #Create an initial codon sequence to put into SLiM based on the fitness profile
     def create_codon_seq(self):
 
+        #Methionine - start codon
         #Methionine - start codon
         start_codon = [14]
 
@@ -293,7 +296,8 @@ class writeSLiM:
                     str(population_parameters["population_size"]) + ", " + population_parameters["parent_pop_name"]+ ");"+
                     "\n\n\tsim.setValue(\"fixations_" + population_parameters["pop_name"] + "\", sim.getValue(\"fixations_"+
                     population_parameters["parent_pop_name"] +"\"));" +
-                    "\n\tsim.setValue(\"fixations_counted_"+ population_parameters["pop_name"]+"\", 0);")
+                    "\n\tsim.setValue(\"fixations_counted_"+ population_parameters["pop_name"]+"\", 0);" + 
+                    "\n\tcatn(" + population_parameters["parent_pop_name"] + ".individualCount);")
 
             if(population_parameters["last_child_clade"] == True):
                 define_population_string += "\n\t" + population_parameters["parent_pop_name"]+".setSubpopulationSize(0);"
@@ -309,6 +313,9 @@ class writeSLiM:
         #Write the end of each population
         self.write_end_pop(population_parameters)
 
+
+
+
     #Write code to add first population, subpopulation or completely remove population and replace with another with non-Wright-Fisher models
     def write_subpop_nonwf(self, population_parameters):
         if(population_parameters["parent_pop_name"] == None):
@@ -319,12 +326,14 @@ class writeSLiM:
                                     "\tsim.addSubpop(\"" + population_parameters["pop_name"] + "\", 0);")
             #If this is the last population broken off, take the last half of the parent population
             if (population_parameters["last_child_clade"] == True):
-                define_population_string += str("\n\t" + population_parameters["pop_name"] + ".takeMigrants(" + population_parameters["parent_pop_name"] + ".individuals);")
+                define_population_string += str("\n\tcatn(" + population_parameters["parent_pop_name"] + ".individualCount);"+
+                "\n\t" + population_parameters["pop_name"] + ".takeMigrants(" + population_parameters["parent_pop_name"] + ".individuals);" )
             else:
                 #Take half of the parent population
                 define_population_string += str("\n\tmigrants = sample(" + population_parameters["parent_pop_name"] + ".individuals, integerDiv("
                                     + population_parameters["parent_pop_name"] + ".individualCount, 2));\n\t"
-                                    + population_parameters["pop_name"] + ".takeMigrants(migrants);")
+                                    + population_parameters["pop_name"] + ".takeMigrants(migrants);" +
+                                    "\n\tcatn(" + population_parameters["parent_pop_name"] + ".individualCount);")
 
             define_population_string += str("\n\n\tsim.setValue(\"fixations_" + population_parameters["pop_name"] + "\", sim.getValue(\"fixations_"+
                                     population_parameters["parent_pop_name"] +"\"));" +
@@ -393,9 +402,12 @@ class writeSLiM:
                 "\n\twriteFile(\"" + os.getcwd()+ "/" + population_parameters["pop_name"] + "_fixed_mutations.txt\"," +
                 " paste(sim.getValue(\"fixations_" + population_parameters["pop_name"] + "\"), sep = \"\"));")
 
+
         end_population_string += "\n}\n\n\n"
 
         self.output_file.write(end_population_string)
+        
+        
 
 
 
@@ -414,27 +426,29 @@ class writeSLiM:
         pop_size = population_parameters["population_size"]
         samp_size = population_parameters["sample_size"]
 
+
+        #Sample according to number given by user
+        terminal_output_string = ""
         if(samp_size == "all"):
-            pop_samples = list(range(pop_size))
-        elif(int(samp_size) < pop_size):
-            pop_samples = random.sample(list(range(pop_size)), int(samp_size))
+            terminal_output_string += "\n\tgenomes = " + pop_name + ".genomes;"
         else:
-            pop_samples = list(range(pop_size))
+            terminal_output_string += ("\n\tgenomes = sample(" + pop_name + ".genomes, min(" + str(int(samp_size)) +
+                                ", 2*" + pop_name + ".individualCount), replace=F);")
 
 
 
         #Iterate through each random sample to write script to output samples of amino acids and nucleotides to fasta files
-        terminal_output_string = ""
-        count = 0
-        for sample in pop_samples:
-            fasta_string_nuc = "\">" + pop_name + "_" + str(count) + ": \\n\" + g.nucleotides()"
-            fasta_string_aa = "\">" + pop_name + "_" + str(count) + ": \\n\" + codonsToAminoAcids(nucleotidesToCodons(g.nucleotides()))"
-
-
-            terminal_output_string += ("\n\tg = "+ pop +".genomes[" + str(sample) + "];" +
-                                       "\n\twriteFile(\"" + nuc_filename + "\", " + fasta_string_nuc +", append = T);" +
-                                       "\n\twriteFile(\"" + aa_filename + "\", " + fasta_string_aa +", append = T);\n\n")
-            count += 1
-
-
+        terminal_output_string += ("\n\n\tfor (g in genomes){" +
+                                    "\n\t\tfasta_string_nuc = paste0(\">\", g.individual, \": \\n\", g.nucleotides());" +
+                                    "\n\t\tfasta_string_prot = paste0(\">\", g.individual, \": \\n\", codonsToAminoAcids(nucleotidesToCodons(g.nucleotides())));" +
+                                    "\n\t\twriteFile(\"" + nuc_filename + "\", fasta_string_nuc,append = T);" +
+                                    "\n\t\twriteFile(\"" + aa_filename + "\", fasta_string_prot,append = T);}" )       
         return terminal_output_string
+        
+        
+        
+        
+        
+    #Closes the file that has been appended to
+    def close_file(self):
+        self.output_file.close()
