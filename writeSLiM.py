@@ -9,6 +9,7 @@
 
 import random, csv, os
 import numpy as np
+import math
 
 #Base class from which other classes inherit
 class writeSLiM:
@@ -30,11 +31,14 @@ class writeSLiM:
         #Set up type of model?
         self.model_type = start_para_dict["wf_model"]
 
+        self.coding_ratio = start_para_dict["coding_ratio"]
+        self.gene_count = start_para_dict["gene_count"]
+
         #Set up conversion from amino acid to codon
         with open(os.path.dirname(os.path.realpath(__file__)) + '/fitnessDataFiles/slim_codon_nums.csv', newline='') as slim_codon_nums:
             reader = csv.reader(slim_codon_nums)
             slim_codons = list(reader)[1:]
-        
+
         slim_codon_nums.close()
 
         self.slim_codon_dict = {}
@@ -75,8 +79,20 @@ class writeSLiM:
                         "\n\tinitializeMutationTypeNuc(\"m1\", 0.5, \"f\", 0.0);" +
                         "\n\tm1.convertToSubstitution = F;" +
                         "\n\tinitializeGenomicElementType(\"g1\", m1, 1.0, mm);" +
-                        "\n\tinitializeGenomicElement(g1, 0, L-1);" +
-                        "\n\tinitializeRecombinationRate("+ str(population_parameters ["recombination_rate"])+");"+
+                        "\n\tinitializeGenomicElementType(\"g2\", m1, 1.0, mm);")
+
+        #Initialize Genomic Elements according to number of genes for easy visualization in SLiMgui. g1 = coding region, g2 = non-coding region
+
+        coding_regions = self.get_coding_seqs()
+        coding_regions[len(coding_regions) - 1] = self.genome_length
+        initialize_string += "\n\tinitializeGenomicElement(g1, 0," +  str((coding_regions[1] * 3) - 1) + ");"
+        c = 1
+        while (c < len(coding_regions) - 1):
+            initialize_string += "\n\tinitializeGenomicElement(g2, " + str(coding_regions[c] * 3) + ", " + str((coding_regions[c+1] * 3) - 1) + ");"
+            initialize_string += "\n\tinitializeGenomicElement(g1, " + str(coding_regions[c+1] * 3) + ", " + str((coding_regions[c+2] * 3) -1) + ");"
+            c += 2
+
+        initialize_string += ("\n\tinitializeRecombinationRate("+ str(population_parameters ["recombination_rate"])+");"+
                         "\n}\n\n\n")
 
         self.output_file.write(initialize_string)
@@ -117,6 +133,28 @@ class writeSLiM:
 
         return selected_codon
 
+    #Return the range of coding sequences for the set number of genes.
+    def get_coding_seqs(self):
+
+        percent_coding = math.ceil(int(self.genome_length) * self.coding_ratio) #Gives approximate number of coding amino acids
+        avg_coding_length = math.ceil(percent_coding / self.gene_count) #Gives avg length of coding regions
+        avg_noncoding_length = 0
+        if (self.gene_count != 1):
+            avg_noncoding_length = math.floor((self.genome_length - percent_coding) / (self.gene_count - 1)) #Average length of non-coding regions by subtracting number of coding aa from total aa
+
+        coding_regions = []
+        current_aa = 0
+
+        while (current_aa < self.genome_length):
+            coding_regions.append(current_aa)
+            coding_regions.append(current_aa + avg_coding_length)
+            current_aa = current_aa + avg_noncoding_length + avg_coding_length + 2 #Accounts for the non-coding region + coding region added previously
+
+        #Ensure this works with fitness function
+        coding_regions[len(coding_regions) - 1] = self.genome_length - 3
+
+        return coding_regions
+
 
 
     #Write the fitness callback for the SLiM script according to the distribution of fitness effects
@@ -131,11 +169,12 @@ class writeSLiM:
 
         fitness_vector = str(self.fitness_profile_nums)
         fitness_vector = "c(" + fitness_vector[1:len(fitness_vector)-1] + ")"
+
         set_up_fitness += ("\n\tdefineConstant(\"fitness_profiles\", " + fitness_vector +");" +
                            "\n\tdefineConstant(\"seq_length\", " + str(len(self.fitness_profile_nums)+2) + ");")
 
         #Write code to start a fixed state from the starting nucleotide sequence
-        set_up_fitness += "sim.setValue(\"fixations_p1\", strsplit(sim.chromosome.ancestralNucleotides(),sep = \"\"));"
+        set_up_fitness += "\n\tsim.setValue(\"fixations_p1\", strsplit(sim.chromosome.ancestralNucleotides(),sep = \"\"));"
 
         #At the start of the sim there are no fixations counted
         set_up_fitness += "\n\tsim.setValue(\"fixations_counted_p1\", 0);"
@@ -160,11 +199,21 @@ class writeSLiM:
                                 "\n\taa_seq = strsplit(aa_seq_string, sep=\"\");" +
                                 "\n\n\tif(aa_seq[0] != \"M\" | aa_seq[seq_length-1] != \"X\"){" +
                                 "\n\t\treturn 0.1;\n\t}" +
-                                "\n\n\taa_seq = aa_seq[1:(seq_length-2)];" +
-                                "\n\tfitnesses = sapply(seq(0,seq_length-3), " +
-                                "\"sim.getValue(aa_seq[applyValue])[fitness_profiles[applyValue]];\");" +
-                                "\n\n\treturn product(fitnesses);\n}\n\n\n")
-                                
+                                "\n\n\taa_seq = aa_seq[1:(seq_length-2)];")
+
+        fitness_function_string +="\n\tfitnesses = c("
+
+        coding_regions = self.get_coding_seqs()
+        c = 0
+        while (c < len(coding_regions)):
+            fitness_function_string += "sapply(seq(" + str(coding_regions[c]) + ", " + str(coding_regions[c+1]) + "), \"sim.getValue(aa_seq[applyValue])[fitness_profiles[applyValue]];\"), "
+            c += 2
+
+        #Modify string to close brackets
+        fitness_function_string = fitness_function_string[0:len(fitness_function_string)-2] + ");"
+
+        fitness_function_string += "\n\n\treturn product(fitnesses);\n}\n\n\n"
+
         self.output_file.write(fitness_function_string)
 
 
@@ -194,7 +243,7 @@ class writeSLiM:
         start_dist = int(population_parameters["dist_from_start"])+1
         end_dist = int(population_parameters["end_dist"])
         pop_name =  population_parameters["pop_name"]
-        
+
         repeated_commands_string = str(start_dist) +":" + str(end_dist) + "late () {"
 
         #Write a command to count the substitutions (identity by state)
@@ -244,7 +293,7 @@ class writeSLiM:
                     str(population_parameters["population_size"]) + ", " + population_parameters["parent_pop_name"]+ ");"+
                     "\n\n\tsim.setValue(\"fixations_" + population_parameters["pop_name"] + "\", sim.getValue(\"fixations_"+
                     population_parameters["parent_pop_name"] +"\"));" +
-                    "\n\tsim.setValue(\"fixations_counted_"+ population_parameters["pop_name"]+"\", 0);" + 
+                    "\n\tsim.setValue(\"fixations_counted_"+ population_parameters["pop_name"]+"\", 0);" +
                     "\n\tcatn(" + population_parameters["parent_pop_name"] + ".individualCount);")
 
             if(population_parameters["last_child_clade"] == True):
@@ -354,8 +403,8 @@ class writeSLiM:
         end_population_string += "\n}\n\n\n"
 
         self.output_file.write(end_population_string)
-        
-        
+
+
 
 
 
@@ -390,13 +439,13 @@ class writeSLiM:
                                     "\n\t\tfasta_string_nuc = paste0(\">\", g.individual, \": \\n\", g.nucleotides());" +
                                     "\n\t\tfasta_string_prot = paste0(\">\", g.individual, \": \\n\", codonsToAminoAcids(nucleotidesToCodons(g.nucleotides())));" +
                                     "\n\t\twriteFile(\"" + nuc_filename + "\", fasta_string_nuc,append = T);" +
-                                    "\n\t\twriteFile(\"" + aa_filename + "\", fasta_string_prot,append = T);}" )       
+                                    "\n\t\twriteFile(\"" + aa_filename + "\", fasta_string_prot,append = T);}" )
         return terminal_output_string
-        
-        
-        
-        
-        
+
+
+
+
+
     #Closes the file that has been appended to
     def close_file(self):
         self.output_file.close()
