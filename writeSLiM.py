@@ -38,7 +38,7 @@ class writeSLiM:
         with open(os.path.dirname(os.path.realpath(__file__)) + '/fitnessDataFiles/slim_codon_nums.csv', newline='') as slim_codon_nums:
             reader = csv.reader(slim_codon_nums)
             slim_codons = list(reader)[1:]
-        
+
         slim_codon_nums.close()
 
         self.slim_codon_dict = {}
@@ -141,8 +141,6 @@ class writeSLiM:
         avg_noncoding_length = 0
         if (self.gene_count != 1):
             avg_noncoding_length = math.floor((self.genome_length - percent_coding) / (self.gene_count - 1)) #Average length of non-coding regions by subtracting number of coding aa from total aa
-        print("Average gene length = " + str(avg_coding_length))
-        print("Average non-coding-gene length = " + str(avg_noncoding_length))
 
         coding_regions = []
         current_aa = 0
@@ -154,7 +152,6 @@ class writeSLiM:
 
         #Ensure this works with fitness function
         coding_regions[len(coding_regions) - 1] = self.genome_length - 3
-        print(coding_regions)
 
         return coding_regions
 
@@ -174,7 +171,7 @@ class writeSLiM:
         fitness_vector = "c(" + fitness_vector[1:len(fitness_vector)-1] + ")"
 
         set_up_fitness += ("\n\tdefineConstant(\"fitness_profiles\", " + fitness_vector +");" +
-                           "\n\tdefineConstant(\"seq_length\", " + str(self.genome_length) + ");")
+                           "\n\tdefineConstant(\"seq_length\", " + str(len(self.fitness_profile_nums)+2) + ");")
 
         #Write code to start a fixed state from the starting nucleotide sequence
         set_up_fitness += "\n\tsim.setValue(\"fixations_p1\", strsplit(sim.chromosome.ancestralNucleotides(),sep = \"\"));"
@@ -296,7 +293,7 @@ class writeSLiM:
                     str(population_parameters["population_size"]) + ", " + population_parameters["parent_pop_name"]+ ");"+
                     "\n\n\tsim.setValue(\"fixations_" + population_parameters["pop_name"] + "\", sim.getValue(\"fixations_"+
                     population_parameters["parent_pop_name"] +"\"));" +
-                    "\n\tsim.setValue(\"fixations_counted_"+ population_parameters["pop_name"]+"\", 0);" + 
+                    "\n\tsim.setValue(\"fixations_counted_"+ population_parameters["pop_name"]+"\", 0);" +
                     "\n\tcatn(" + population_parameters["parent_pop_name"] + ".individualCount);")
 
             if(population_parameters["last_child_clade"] == True):
@@ -406,8 +403,8 @@ class writeSLiM:
         end_population_string += "\n}\n\n\n"
 
         self.output_file.write(end_population_string)
-        
-        
+
+
 
 
 
@@ -442,13 +439,13 @@ class writeSLiM:
                                     "\n\t\tfasta_string_nuc = paste0(\">\", g.individual, \": \\n\", g.nucleotides());" +
                                     "\n\t\tfasta_string_prot = paste0(\">\", g.individual, \": \\n\", codonsToAminoAcids(nucleotidesToCodons(g.nucleotides())));" +
                                     "\n\t\twriteFile(\"" + nuc_filename + "\", fasta_string_nuc,append = T);" +
-                                    "\n\t\twriteFile(\"" + aa_filename + "\", fasta_string_prot,append = T);}" )       
+                                    "\n\t\twriteFile(\"" + aa_filename + "\", fasta_string_prot,append = T);}" )
         return terminal_output_string
-        
-        
-        
-        
-        
+
+
+
+
+
     #Closes the file that has been appended to
     def close_file(self):
         self.output_file.close()
