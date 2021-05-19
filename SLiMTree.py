@@ -73,17 +73,31 @@ class SLiMTree:
         parser.add_argument('-w', '--wright_fisher_model', type = self.str2bool, default=True, const=True, nargs='?',
                 help = 'boolean specifying whether this is a wright-fisher model or non-wright-fisher model. default = True')
 
+        parser.add_argument('-G', '--gene_count', type = int, default = 1, help = "Number of genes in the model. Default = 1.")
+        parser.add_argument('-C', '--coding_ratio', type = float, default = 1.0, help = "Ratio of the genome which are coding regions as a ratio coding/noncoding. Default = 1.0")
+
         #Get arguments from user
         arguments = parser.parse_args()
 
         #Set up tree
         self.input_file = arguments.input_tree[0]
-        
+
         #Get simulation type and ensure that required arguments are given for simulation type
         self.simulationType = arguments.tool.translate(str.maketrans('', '', string.punctuation)).lower()
         if (self.simulationType == "slimtreehpc" and (arguments.partition == None or arguments.time == None)):
             print("When using SLiM-Tree-HPC, partition and time data must be provided. Closing program.")
             sys.exit(0)
+
+        #Check to make sure gene count and coding ratio are valid
+        if (arguments.gene_count < 1 or arguments.gene_count > arguments.genome_length):
+            print("Number of genes must be greater than 0 and less than the length of the genome. Closing program.")
+            sys.exit(0);
+
+        if (arguments.coding_ratio <= 0 or arguments.coding_ratio > 1.0):
+            print("Coding ratio must be greater than 0 and less than or equal to 1. Please re-enter as a ratio (0, 1]. Closing program.")
+            sys.exit(0);
+
+        
 
         #Set up the starting parameters
         self.starting_parameters["mutation_rate"] = arguments.mutation_rate
@@ -94,10 +108,13 @@ class SLiMTree:
         self.starting_parameters["sample_size"] = arguments.sample_size
 
         self.starting_parameters["wf_model"] = arguments.wright_fisher_model
-        
+
+        self.starting_parameters["gene_count"] = arguments.gene_count
+        self.starting_parameters["coding_ratio"] = arguments.coding_ratio
+
         self.starting_parameters["partition"] = arguments.partition
         self.starting_parameters["time"] = arguments.time
-        
+
         self.starting_parameters["count_subs"] = arguments.count_subs
         self.starting_parameters["output_gens"] = arguments.output_gens
         self.starting_parameters["backup"] = arguments.backup
@@ -167,7 +184,7 @@ class SLiMTree:
             fitness_dist = list(reader)[1:]
             fitness_length = len(fitness_dist)
             #print("Fitness profile length: " + str(fitness_length))
-            fitness_profile_nums = random.choices(range(fitness_length),k=self.starting_parameters["genome_length"]-2 ) # HERE ***
+            fitness_profile_nums = random.choices(range(fitness_length),k=self.starting_parameters["genome_length"]-2 )
             #print("Fitness profile nums: " + str(fitness_profile_nums))
 
 
@@ -224,7 +241,7 @@ class SLiMTree:
             'count_subs': 'count_subs',
             'output_gens': 'output_gens',
             'backup': 'backup'
-            
+
         }
 
         if(self.data_file == None):
@@ -354,7 +371,7 @@ class SLiMTree:
                     gens = self.str2bool(current_clade_data['output_gens'])
                 if('backup' in current_clade_data.keys()):
                     backup = self.str2bool(current_clade_data['backup'])
-                
+
 
         #Figure out what population name is for self and assign clade name appropriately
         self.pop_num += 1
@@ -394,11 +411,11 @@ class SLiMTree:
             "terminal_clade" : clade.clades == [],
             "last_child_clade" : last_child_clade,
             "sample_size": samp_size,
-            "partition": part, 
+            "partition": part,
             "time" : time,
             "count_subs" : subs,
             "output_gens" : gens,
-            "backup" : backup 
+            "backup" : backup
         }
 
         return [clade_dict]
@@ -417,7 +434,7 @@ class SLiMTree:
         else:
             print ("Invalid tool type. Please specify a tool as SLiM-Tree or SLiM-Tree-HPC. Program closing")
             sys.exit(0)
-            
+
         #Write a script for each clade which will be run sequentially
         if (self.starting_parameters["wf_model"]): #If this is a Wright-Fisher model, use a different write_subpop function
             for clade in clade_dict_list:
